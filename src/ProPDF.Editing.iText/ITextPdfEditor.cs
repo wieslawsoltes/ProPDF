@@ -148,7 +148,11 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
                 break;
             case FlattenForms flatten:
                 var form = GetForm(document);
-                if (flatten.Name is not null && !form.PartialFormFlattening(flatten.Name)) throw new KeyNotFoundException(flatten.Name);
+                if (flatten.Name is not null)
+                {
+                    if (form.GetField(flatten.Name) is null) throw new KeyNotFoundException(flatten.Name);
+                    form.PartialFormFlattening(flatten.Name);
+                }
                 form.FlattenFields();
                 break;
             case RedactRegion redaction: ApplyRedaction(document, redaction, cancellationToken); break;
