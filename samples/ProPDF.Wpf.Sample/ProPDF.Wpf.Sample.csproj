@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><OutputType>WinExe</OutputType><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
+    <ProjectReference Include="../../src/ProPDF.Wpf/ProPDF.Wpf.csproj" />
+    <PackageReference Include="itext.pdfsweep" NoWarn="NU1701" />
+  </ItemGroup>
+</Project>

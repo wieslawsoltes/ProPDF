@@ -6,16 +6,20 @@ namespace ProPDF.Presentation;
 public sealed class PdfEditorContext
 {
     public PdfEditorContext(PdfViewportController viewport, IPdfDocumentInspector? inspector = null,
-        Func<CancellationToken, Task<PdfSnapshot>>? createDocument = null)
+        Func<CancellationToken, Task<PdfSnapshot>>? createDocument = null, IPdfDocumentLoader? documentLoader = null)
     {
         Viewport = viewport ?? throw new ArgumentNullException(nameof(viewport));
         Inspector = inspector;
         CreateDocument = createDocument;
+        DocumentLoader = documentLoader;
     }
     public PdfViewportController Viewport { get; }
     public PdfSession Session => Viewport.Session;
     public IPdfDocumentInspector? Inspector { get; }
+    public IPdfPageExtractor? PageExtractor => Inspector as IPdfPageExtractor;
+    public IPdfAttachmentReader? AttachmentReader => Inspector as IPdfAttachmentReader;
     public Func<CancellationToken, Task<PdfSnapshot>>? CreateDocument { get; }
+    public IPdfDocumentLoader? DocumentLoader { get; }
 
     public async Task NewAsync(CancellationToken cancellationToken = default)
     {
