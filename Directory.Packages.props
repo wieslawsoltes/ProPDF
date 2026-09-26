@@ -7,6 +7,9 @@
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
     <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.3" />
     <PackageVersion Include="PdfPig.Rendering.Skia" Version="0.1.16.4" />
+    <PackageVersion Include="itext" Version="9.7.0" />
+    <PackageVersion Include="itext.pdfsweep" Version="5.0.7" />
+    <PackageVersion Include="itext.bouncy-castle-adapter" Version="9.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />

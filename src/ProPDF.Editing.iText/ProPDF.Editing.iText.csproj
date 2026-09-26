@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Optional iText PDF editing, AcroForms, pdfSweep redaction and digital-signature services. Dependencies require AGPL compliance or commercial iText licensing.</Description>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Core/ProPDF.Core.csproj" />
+    <PackageReference Include="itext" />
+    <PackageReference Include="itext.pdfsweep" />
+    <PackageReference Include="itext.bouncy-castle-adapter" />
+    <None Include="LICENSE-NOTICE.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>
