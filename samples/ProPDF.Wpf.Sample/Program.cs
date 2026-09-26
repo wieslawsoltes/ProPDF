@@ -34,7 +34,7 @@ internal static class Program
                 window.Content = null;
                 await runtime.DisposeAsync();
                 approved = true;
-                application.Dispatcher.BeginInvoke(new Action(window.Close));
+                await application.Dispatcher.InvokeAsync(window.Close);
             }
             finally { closing = false; }
         };
