@@ -1,0 +1,38 @@
+name: Package consumers
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  consumers:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@c604d0cd6c8a7f371b2b92b646b3e6a74aef2c4e
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore ProPDF.slnx
+      - run: dotnet build ProPDF.slnx -c Release --no-restore
+      - run: dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages
+      - name: Clean external consumers
+        shell: pwsh
+        run: ./scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: packages-${{ matrix.os }}
+          path: artifacts/packages
+          if-no-files-found: warn
