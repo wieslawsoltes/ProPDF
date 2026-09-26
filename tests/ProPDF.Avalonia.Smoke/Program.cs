@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
@@ -50,7 +51,7 @@ internal static class Program
             using var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("Avalonia produced no rendered frame.");
             var path = args.Length > 0 ? args[0] : "artifacts/headless/avalonia.png";
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-            frame.Save(path);
+            frame.Save(path, PngBitmapEncoderOptions.Default);
             using (var bitmap = SKBitmap.Decode(path))
             {
                 if (bitmap.Width < 1000 || bitmap.Height < 600) throw new InvalidOperationException("Unexpected UI screenshot dimensions.");
