@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Avalonia PDF viewer, thumbnail and editor controls backed by shared Skia rendering and presentation.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Skia" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Description>WPF PDF viewer, thumbnail and editor controls with shared Skia rendering. No legacy Skia views or OpenTK dependency.</Description>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" /></ItemGroup>
+</Project>
