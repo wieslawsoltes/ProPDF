@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>UI-independent PDF snapshots, transactions, geometry and page layout.</Description>
+  </PropertyGroup>
+</Project>
