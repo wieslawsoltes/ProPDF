@@ -8,6 +8,7 @@
     <ProjectReference Include="../../src/ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
     <ProjectReference Include="../../src/ProPDF.Engine.PdfPig/ProPDF.Engine.PdfPig.csproj" />
     <ProjectReference Include="../../src/ProPDF.Editing.iText/ProPDF.Editing.iText.csproj" />
+    <PackageReference Include="itext.pdfsweep" NoWarn="NU1701" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
