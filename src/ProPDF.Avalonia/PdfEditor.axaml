@@ -26,7 +26,7 @@
         <ComboBox Width="157" Margin="10,3,4,3" ItemsSource="{Binding Tools}" SelectedItem="{Binding SelectedTool, Mode=TwoWay}">
           <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}"/></DataTemplate></ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBox Width="205" Margin="3" Watermark="Text, comment or new field name" Text="{Binding ToolText, Mode=TwoWay}"/>
+        <TextBox Width="205" Margin="3" PlaceholderText="Text, comment or new field name" Text="{Binding ToolText, Mode=TwoWay}"/>
         <Button Content="Copy text" Command="{Binding CopyCommand}"/>
       </WrapPanel>
     </Border>
@@ -38,7 +38,7 @@
         <Button Content="−" Command="{Binding ZoomOutCommand}"/><TextBlock Text="{Binding ZoomLabel}" Width="48" VerticalAlignment="Center" TextAlignment="Center" FontSize="12"/><Button Content="+" Command="{Binding ZoomInCommand}"/>
         <Button Content="Fit width" Command="{Binding FitWidthCommand}"/><Button Content="Fit page" Command="{Binding FitPageCommand}"/>
         <ComboBox Width="118" Margin="5,3" ItemsSource="{Binding LayoutModes}" SelectedItem="{Binding LayoutMode, Mode=TwoWay}"/>
-        <TextBox Width="180" Margin="8,3,3,3" Watermark="Search document" Text="{Binding SearchQuery, Mode=TwoWay}"/>
+        <TextBox Width="180" Margin="8,3,3,3" PlaceholderText="Search document" Text="{Binding SearchQuery, Mode=TwoWay}"/>
         <Button Content="Find" Command="{Binding SearchCommand}"/><Button Content="‹" ToolTip.Tip="Previous match" Command="{Binding PreviousMatchCommand}"/><Button Content="›" ToolTip.Tip="Next match" Command="{Binding NextMatchCommand}"/>
         <TextBlock Text="{Binding MatchLabel}" Margin="8,0" VerticalAlignment="Center" FontSize="11"/>
       </WrapPanel>
@@ -50,11 +50,11 @@
           <WrapPanel><Button Content="Rotate" Command="{Binding RotateCommand}"/><Button Content="Insert" Command="{Binding InsertPageCommand}"/><Button Content="Delete" Classes="danger" Command="{Binding DeletePageCommand}"/></WrapPanel>
           <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicatePageCommand}"/><Button Content="↑" Command="{Binding MoveUpCommand}"/><Button Content="↓" Command="{Binding MoveDownCommand}"/></WrapPanel>
         </StackPanel>
-        <ListBox Background="Transparent" BorderThickness="0" ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}" HorizontalContentAlignment="Center">
+        <ListBox Background="Transparent" BorderThickness="0" ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}">
           <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
             <DataTemplate>
-              <StackPanel Margin="4,6" Spacing="5">
+              <StackPanel Margin="4,6" Spacing="5" HorizontalAlignment="Center">
                 <local:PdfThumbnail Controller="{Binding DataContext.Viewport, RelativeSource={RelativeSource AncestorType={x:Type local:PdfEditor}}}" PageNumber="{Binding Number}"/>
                 <TextBlock Text="{Binding Number, StringFormat='Page {0}'}" TextAlignment="Center" FontSize="11" Foreground="#53627C"/>
               </StackPanel>
@@ -82,7 +82,7 @@
               <ListBox ItemsSource="{Binding Annotations}" SelectedItem="{Binding SelectedAnnotation, Mode=TwoWay}" Height="220">
                 <ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="3"><TextBlock Text="{Binding Kind}" FontSize="11" FontWeight="SemiBold"/><TextBlock Text="{Binding Contents}" TextWrapping="Wrap" MaxHeight="55" FontSize="12"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
               </ListBox>
-              <TextBox Text="{Binding Comment, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" Watermark="Select a comment"/>
+              <TextBox Text="{Binding Comment, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" PlaceholderText="Select a comment"/>
               <WrapPanel><Button Content="Update" Command="{Binding UpdateCommentCommand}"/><Button Content="Delete" Command="{Binding DeleteAnnotationCommand}"/></WrapPanel>
               <TextBlock Classes="hint" Text="Choose a tool, then drag on the page. Text and note tools use the text box in the main toolbar."/>
               <TextBlock Text="REDACTION" Classes="caption"/>
@@ -96,7 +96,7 @@
               <ComboBox ItemsSource="{Binding Fields}" SelectedItem="{Binding SelectedField, Mode=TwoWay}" HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
-              <TextBox Text="{Binding FieldValue, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" Watermark="Field value"/>
+              <TextBox Text="{Binding FieldValue, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" PlaceholderText="Field value"/>
               <Button Content="Apply value" Classes="primary" Command="{Binding SetFieldValueCommand}"/>
               <Button Content="Flatten all fields" Command="{Binding FlattenFormsCommand}"/>
               <TextBlock Classes="hint" Text="Use Text form field or Checkbox field in the tool selector to draw a new field. Enter a unique field name in the toolbar text box. Read-only fields cannot be changed."/>

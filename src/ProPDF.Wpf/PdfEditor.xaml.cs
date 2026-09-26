@@ -66,8 +66,8 @@ public sealed partial class PdfEditor : UserControl
             panel.Children.Add(new TextBlock { Text = "Editing a protected PDF requires its owner password.", Margin = new Thickness(0, 12, 0, 0), TextWrapping = TextWrapping.Wrap });
             panel.Children.Add(input);
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            var cancel = new Button { Content = "Cancel", IsCancel = true, Padding = new Thickness(16, 8), Margin = new Thickness(4) };
-            var accept = new Button { Content = "Open", IsDefault = true, Padding = new Thickness(16, 8), Margin = new Thickness(4) };
+            var cancel = new Button { Content = "Cancel", IsCancel = true, Padding = new Thickness(16, 8, 16, 8), Margin = new Thickness(4) };
+            var accept = new Button { Content = "Open", IsDefault = true, Padding = new Thickness(16, 8, 16, 8), Margin = new Thickness(4) };
             cancel.Click += (_, _) => dialog.DialogResult = false;
             accept.Click += (_, _) => dialog.DialogResult = true;
             buttons.Children.Add(cancel); buttons.Children.Add(accept); panel.Children.Add(buttons); dialog.Content = panel;
