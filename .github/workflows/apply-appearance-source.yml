@@ -1,0 +1,81 @@
+name: Apply verified appearance and rendering sources
+on:
+  push:
+    branches: [feature/content-appearance-images]
+    paths: ['.github/workflows/apply-appearance-source.yml']
+permissions:
+  contents: write
+concurrency:
+  group: apply-appearance-source
+  cancel-in-progress: false
+jobs:
+  apply:
+    if: github.repository == 'wieslawsoltes/ProPDF' && github.ref == 'refs/heads/feature/content-appearance-images'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feature/content-appearance-images
+          fetch-depth: 0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: BobLd/PdfPig.Rendering.Skia
+          ref: e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11
+          path: .upstream-renderer
+          persist-credentials: false
+          sparse-checkout: |
+            UglyToad.PdfPig.Rendering.Skia
+            LICENSE.txt
+            NOTICE.txt
+          sparse-checkout-cone-mode: false
+      - name: Verify exact patches and attributed upstream files before materializing source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python - <<'PY'
+          import base64, hashlib, json, lzma, pathlib, subprocess
+          transport = pathlib.Path('.appearance-transfer')
+          target = pathlib.Path('src/ProPDF.Engine.PdfPig/Compatibility/PdfPig.Skia')
+          upstream = pathlib.Path('.upstream-renderer')
+          def apply(encoded, size, digest, vendor=False):
+              patch = lzma.decompress(base64.b64decode(encoded, validate=True))
+              assert len(patch) == size and hashlib.sha256(patch).hexdigest() == digest
+              for line in patch.decode().splitlines():
+                  if line.startswith('+++ b/'):
+                      name = line[6:]
+                      path = pathlib.PurePosixPath(name)
+                      assert not path.is_absolute() and '..' not in path.parts
+                      if vendor:
+                          assert name.startswith(str(target) + '/') and name.endswith('.cs')
+                      else:
+                          assert name in ('README.md', 'CHANGELOG.md', 'THIRD-PARTY-NOTICES.md', 'Directory.Build.props', 'Directory.Packages.props', 'mkdocs.yml', '.github/workflows/validate.yml', '.github/workflows/release.yml') or name.startswith(('src/ProPDF.', 'tests/ProPDF.', 'docs/', 'scripts/'))
+              filename = pathlib.Path('/tmp/renderer.patch' if vendor else '/tmp/appearance.patch')
+              filename.write_bytes(patch)
+              subprocess.run(['git', 'apply', '--check', str(filename)], check=True)
+              subprocess.run(['git', 'apply', '--index', str(filename)], check=True)
+          apply(''.join((transport / ('part' + str(i))).read_text().strip() for i in range(3)), 145826,
+                '550015873d4a64a680bd86a15fdd161b76e408a54e64aee2a2b8ece1384458bd')
+          manifest = json.loads((target / 'PROVENANCE.json').read_text())
+          assert manifest['commit'] == 'e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11'
+          assert manifest['repository'] == 'https://github.com/BobLd/PdfPig.Rendering.Skia'
+          assert manifest['license'] == 'Apache-2.0' and len(manifest['files']) == 33
+          for entry in manifest['files']:
+              relative = pathlib.PurePosixPath(entry['path'])
+              assert not relative.is_absolute() and '..' not in relative.parts
+              assert relative.suffix == '.cs' or entry['path'] in ('LICENSE.txt', 'NOTICE.txt')
+              original = upstream / (entry['path'] if entry['path'] in ('LICENSE.txt', 'NOTICE.txt') else 'UglyToad.PdfPig.Rendering.Skia/' + entry['path'])
+              assert hashlib.sha256(original.read_bytes()).hexdigest() == entry['upstream_sha256']
+              output = target / entry['path']
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_text(original.read_text(encoding='utf-8-sig'), encoding='utf-8')
+          subprocess.run(['git', 'add', str(target)], check=True)
+          apply((transport / 'renderer').read_text().strip(), 36770,
+                '07ae877f844e927f3feb1ecae418f70d158555041ad60a2419a3a561298dee95', True)
+          subprocess.run(['python', 'scripts/verify-renderer-source.py'], check=True)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: native content appearance, isolated image replacement and corrected Skia image painting'
+          git push origin HEAD:refs/heads/feature/content-appearance-images
