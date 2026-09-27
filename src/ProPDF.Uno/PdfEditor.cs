@@ -109,5 +109,12 @@ public sealed class PdfEditor : UserControl, IDisposable
         _body.ColumnDefinitions[0].Width = new GridLength(ActualWidth >= 1250 || _pagesRequested ? 174 : 0);
         _body.ColumnDefinitions[2].Width = new GridLength(ActualWidth >= 1000 || _inspectorRequested ? Math.Min(316, ActualWidth * .75) : 0);
     }
-    public void Dispose() { if (_disposed) return; _disposed = true; Detach(); _defaultFiles?.Dispose(); _defaultFiles = null; }
+    // Uno's FrameworkElement.Dispose is nonvirtual; reimplement IDisposable and explicitly release its resources too.
+    public new void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        try { Detach(); _defaultFiles?.Dispose(); _defaultFiles = null; }
+        finally { base.Dispose(); }
+    }
 }

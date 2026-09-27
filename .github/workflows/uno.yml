@@ -20,16 +20,18 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
-      - name: Install WebAssembly toolchain
-        run: dotnet workload install wasm-tools
+      - name: Install WebAssembly toolchain and restore all graphs
+        run: |
+          dotnet workload install wasm-tools
+          dotnet restore ProPDF.slnx
       - name: Build desktop sample
-        run: dotnet build samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop
+        run: dotnet build samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop --no-restore
       - name: Publish real Uno browser sample
-        run: dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-browserwasm -o artifacts/uno -p:WasmShellWebAppBasePath=/ProPDF/ -p:WasmShellILLinkerEnabled=false
-      - name: Audit complete browser and desktop dependency graphs
+        run: dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-browserwasm -o artifacts/uno --no-restore -p:WasmShellWebAppBasePath=/ProPDF/ -p:WasmShellILLinkerEnabled=false
+      - name: Audit every restored dependency graph
         run: |
           python scripts/verify-renderer-source.py
-          python scripts/audit-licenses.py --allow-partial
+          python scripts/audit-licenses.py
           python -m unittest discover -s scripts/tests -v
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:

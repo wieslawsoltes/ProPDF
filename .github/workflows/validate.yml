@@ -21,11 +21,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, '${{ inputs.macos-runner }}']
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -36,12 +36,14 @@ jobs:
           mkdir -p artifacts/source
           git archive --format=zip --output=artifacts/source/ProPDF-source.zip HEAD
           git rev-parse HEAD > artifacts/source/commit.txt
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: |
             10.0.x
             8.0.x
-      - name: Restore
+      - name: Install Uno WebAssembly build tools
+        run: dotnet workload install wasm-tools
+      - name: Restore all libraries and sample heads
         run: dotnet restore ProPDF.slnx
       - name: Verify source-pinned renderer and legal notices
         run: python scripts/verify-renderer-source.py
@@ -65,7 +67,7 @@ jobs:
       - name: External NuGet consumers
         shell: pwsh
         run: ./scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: ${{ inputs.artifact-prefix }}-${{ matrix.os }}
