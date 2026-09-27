@@ -88,6 +88,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
     {
         switch (operation)
         {
+            case PdfFormDataEdit formData: ApplyFormDataEdit(document, formData, cancellationToken); break;
             case PdfOutlineEdit outline: ApplyOutlineEdit(document, outline, cancellationToken); break;
             case AddInternalLink link: InsertInternalLink(document, link); break;
             case RotatePage rotate:
