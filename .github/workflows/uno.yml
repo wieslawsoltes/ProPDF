@@ -20,10 +20,12 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
-      - name: Install WebAssembly toolchain and restore all graphs
+      - name: Install toolchain and restore all release dependency graphs
         run: |
           dotnet workload install wasm-tools
-          dotnet restore ProPDF.slnx
+          dotnet restore ProPDF.slnx -p:Configuration=Release
+      - name: Collect license evidence
+        run: python scripts/collect-license-evidence.py
       - name: Build desktop sample
         run: dotnet build samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop --no-restore
       - name: Publish real Uno browser sample

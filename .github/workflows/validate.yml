@@ -9,7 +9,7 @@ on:
         type: string
         default: validation
       macos-runner:
-        description: 'Standard macOS runner image. Release validation defaults to Apple Silicon; PR CI explicitly selects Intel.'
+        description: 'Release defaults to Apple Silicon; PR CI explicitly selects Intel.'
         type: string
         default: macos-26
 permissions:
@@ -43,12 +43,14 @@ jobs:
             8.0.x
       - name: Install Uno WebAssembly build tools
         run: dotnet workload install wasm-tools
-      - name: Restore all libraries and sample heads
-        run: dotnet restore ProPDF.slnx
+      - name: Restore all release dependency graphs
+        run: dotnet restore ProPDF.slnx -p:Configuration=Release
       - name: Verify source-pinned renderer and legal notices
         run: python scripts/verify-renderer-source.py
-      - name: Enforce permissive dependency licenses
-        run: python scripts/audit-licenses.py
+      - name: Collect complete license evidence and enforce policy
+        run: |
+          python scripts/collect-license-evidence.py
+          python scripts/audit-licenses.py
       - name: License gate regression tests
         run: python -m unittest discover -s scripts/tests -v
       - name: Build libraries and native applications

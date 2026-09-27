@@ -5,10 +5,15 @@
     <IsPackable>true</IsPackable>
     <GenerateLibraryLayout>true</GenerateLibraryLayout>
     <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
+    <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
     <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <LangVersion>14.0</LangVersion>
     <Description>Reusable Uno Platform PDF viewer, lazy thumbnails and editor shell using shared ProPDF presentation and Skia scenes.</Description>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" />
+    <PackageReference Include="Uno.WinUI" Version="6.7.135" />
+    <PackageReference Include="Uno.WinUI.Graphics2DSK" Version="6.7.135" />
+  </ItemGroup>
 </Project>
