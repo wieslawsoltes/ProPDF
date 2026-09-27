@@ -15,17 +15,25 @@ public sealed partial class PdfViewportController
         public List<PdfPoint> Points { get; } = [start];
     }
     private DragState? _drag;
+    private long _searchGeneration;
+    private long _selectionGeneration;
 
     public bool BeginInteraction(PdfPoint point, bool forcePan = false)
     {
+        if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) return false;
         lock (_gate)
         {
-            if (_snapshot is null) return false;
+            if (_disposed || _snapshot is null) return false;
             var tool = forcePan ? PdfTool.Pan : _tool;
             var hit = HitTestLocked(point);
             if (hit is null && tool != PdfTool.Pan) return false;
             _drag = new DragState(_snapshot.Id, hit?.PageNumber ?? _currentPage, hit?.Point ?? new PdfPoint(), point, _offset, tool);
-            if (tool != PdfTool.Pan) _selection = null;
+            if (tool != PdfTool.Pan)
+            {
+                _selection = null;
+                _selectedText = "";
+                _selectionGeneration++;
+            }
         }
         Notify();
         return true;
@@ -33,10 +41,11 @@ public sealed partial class PdfViewportController
 
     public void MoveInteraction(PdfPoint point)
     {
+        if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) return;
         PdfPoint? pan = null;
         lock (_gate)
         {
-            if (_drag is not { } drag || _snapshot?.Id != drag.Revision) return;
+            if (_disposed || _drag is not { } drag || _snapshot?.Id != drag.Revision) return;
             if (drag.Tool == PdfTool.Pan)
                 pan = new PdfPoint(drag.Offset.X - (point.X - drag.ViewportStart.X), drag.Offset.Y - (point.Y - drag.ViewportStart.Y));
             else if (_placements.TryGetValue(drag.Page, out var page))
@@ -45,7 +54,8 @@ public sealed partial class PdfViewportController
                 var local = new PdfPoint(Math.Clamp((point.X + _offset.X - page.Bounds.X) / _layout!.Scale, 0, size.Width),
                     Math.Clamp((point.Y + _offset.Y - page.Bounds.Y) / _layout.Scale, 0, size.Height));
                 _selection = new PdfSelection(drag.Revision, drag.Page, PdfRect.FromPoints(drag.Start, local));
-                if (drag.Points.Count < 100_000 && (Math.Abs(drag.Points[^1].X - local.X) + Math.Abs(drag.Points[^1].Y - local.Y) >= 0.5)) drag.Points.Add(local);
+                if (drag.Points.Count < 100_000 && Math.Abs(drag.Points[^1].X - local.X) + Math.Abs(drag.Points[^1].Y - local.Y) >= 0.5)
+                    drag.Points.Add(local);
             }
         }
         if (pan is { } offset) SetOffset(offset.X, offset.Y);
@@ -57,23 +67,36 @@ public sealed partial class PdfViewportController
         MoveInteraction(point);
         DragState? drag;
         PdfSelection? selection;
+        PdfSnapshot? document;
         string text;
+        long generation;
         lock (_gate)
         {
+            if (_disposed) return;
             drag = _drag;
             selection = _selection;
+            document = _snapshot;
             text = _toolText;
+            generation = _selectionGeneration;
             _drag = null;
         }
-        if (drag is null || drag.Tool == PdfTool.Pan || selection is null || selection.Revision != Document?.Id) return;
+        if (drag is null || drag.Tool == PdfTool.Pan || selection is null || document?.Id != selection.Revision) return;
         var bounds = selection.Bounds;
         if (drag.Tool == PdfTool.SelectText)
         {
-            var document = Document!;
             var page = await _textService.GetPageTextAsync(document, selection.PageNumber, cancellationToken).ConfigureAwait(false);
             var selected = page.Words.Where(word => word.Bounds.Intersects(bounds)).ToArray();
-            lock (_gate) if (_snapshot?.Id == document.Id) _selectedText = string.Join(" ", selected.Select(word => word.Text));
+            lock (_gate)
+                if (!_disposed && _snapshot?.Id == document.Id && generation == _selectionGeneration)
+                    _selectedText = string.Join(" ", selected.Select(word => word.Text));
             Notify();
+            return;
+        }
+        // A horizontal/vertical ink stroke is valid even when its selection rectangle has zero area.
+        if (drag.Tool == PdfTool.Ink)
+        {
+            if (drag.Points.Count >= 2)
+                await Session.ApplyAsync(new AddInkAnnotation(selection.PageNumber, drag.Points), selection.Revision, cancellationToken).ConfigureAwait(false);
             return;
         }
         if (drag.Tool == PdfTool.SelectRegion || bounds.Width < 0.5 || bounds.Height < 0.5) return;
@@ -82,6 +105,7 @@ public sealed partial class PdfViewportController
             lock (_gate)
             {
                 if (_snapshot?.Id != selection.Revision) throw new PdfRevisionConflictException();
+                if (_redactions.Count >= 10_000) throw new InvalidOperationException("The redaction mark limit has been reached.");
                 _redactions.Add(selection);
                 _selection = null;
             }
@@ -96,7 +120,6 @@ public sealed partial class PdfViewportController
             PdfTool.Text => new AddText(selection.PageNumber, new PdfPoint(bounds.X, bounds.Y + Math.Min(14, bounds.Height)), text),
             PdfTool.Rectangle => new AddShape(selection.PageNumber, bounds),
             PdfTool.Ellipse => new AddShape(selection.PageNumber, bounds, PdfShapeKind.Ellipse),
-            PdfTool.Ink => new AddInkAnnotation(selection.PageNumber, drag.Points),
             PdfTool.ReplaceText => new ReplaceRegionText(selection.PageNumber, bounds, text),
             PdfTool.TextField => new AddFormField(selection.PageNumber, bounds, text, PdfFormFieldKind.Text),
             PdfTool.CheckBox => new AddFormField(selection.PageNumber, bounds, text, PdfFormFieldKind.CheckBox),
@@ -106,10 +129,10 @@ public sealed partial class PdfViewportController
     }
 
     public void CancelInteraction() { lock (_gate) _drag = null; Notify(); }
-    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; } Notify(); }
+    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; _selectionGeneration++; } Notify(); }
     public void ClearRedactions() { lock (_gate) _redactions.Clear(); Notify(); }
 
-    /// <summary>Call only after an explicit application confirmation. The marks themselves are not saved into the PDF.</summary>
+    /// <summary>Call only after an explicit application confirmation. Marks themselves are not saved into the PDF.</summary>
     public async Task ApplyRedactionsAsync(CancellationToken cancellationToken = default)
     {
         PdfSelection[] marks;
@@ -121,44 +144,55 @@ public sealed partial class PdfViewportController
 
     public async Task SearchAsync(string query, PdfSearchOptions? options = null, CancellationToken cancellationToken = default)
     {
-        var document = Document ?? throw new InvalidOperationException("No PDF is open.");
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-        var hits = string.IsNullOrWhiteSpace(query) ? Array.Empty<PdfSearchHit>() :
-            await _textService.SearchAsync(document, query, options, linked.Token).ConfigureAwait(false);
+        PdfSnapshot document;
+        long generation;
+        CancellationToken lifetime;
         lock (_gate)
         {
-            if (_disposed || _snapshot?.Id != document.Id) return;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            document = _snapshot ?? throw new InvalidOperationException("No PDF is open.");
+            generation = ++_searchGeneration;
+            lifetime = _lifetime.Token;
+        }
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime);
+        var hits = string.IsNullOrWhiteSpace(query) ? Array.Empty<PdfSearchHit>() :
+            await _textService.SearchAsync(document, query, options, linked.Token).ConfigureAwait(false);
+        linked.Token.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            if (_disposed || _snapshot?.Id != document.Id || generation != _searchGeneration) return;
             _searchHits = hits;
             _searchIndex = hits.Count == 0 ? -1 : 0;
+            if (hits.Count > 0) RevealHitLocked(hits[0]);
         }
-        if (hits.Count > 0) RevealHit(hits[0]);
-        Notify();
+        ScheduleRender();
     }
 
     public void NextSearchResult(bool backwards = false)
     {
-        PdfSearchHit hit;
         lock (_gate)
         {
-            if (_searchHits.Count == 0) return;
+            if (_disposed || _searchHits.Count == 0) return;
             _searchIndex = (_searchIndex + (backwards ? -1 : 1) + _searchHits.Count) % _searchHits.Count;
-            hit = _searchHits[_searchIndex];
-        }
-        RevealHit(hit);
-        Notify();
-    }
-
-    private void RevealHit(PdfSearchHit hit)
-    {
-        GoToPage(hit.PageNumber);
-        lock (_gate)
-        {
-            if (hit.Bounds.Count > 0 && _placements.TryGetValue(hit.PageNumber, out var page))
-            {
-                _offset = new PdfPoint(_offset.X, Math.Max(0, page.Bounds.Y + hit.Bounds[0].Y * _layout!.Scale - _viewport.Height / 3));
-                ClampOffset();
-            }
+            RevealHitLocked(_searchHits[_searchIndex]);
         }
         ScheduleRender();
+    }
+
+    // Called under _gate: changing document, search generation or layout cannot interleave navigation.
+    private void RevealHitLocked(PdfSearchHit hit)
+    {
+        _currentPage = hit.PageNumber;
+        if (_mode == PdfLayoutMode.SinglePage) RebuildLayout();
+        if (_placements.TryGetValue(hit.PageNumber, out var page))
+        {
+            var target = hit.Bounds.Count > 0 ? hit.Bounds[0] : new PdfRect(0, 0, 1, 1);
+            _offset = new PdfPoint(Math.Max(0, page.Bounds.X + target.X * _layout!.Scale - _viewport.Width / 4),
+                Math.Max(0, page.Bounds.Y + target.Y * _layout.Scale - _viewport.Height / 3));
+            ClampOffset();
+        }
+        // Clamping normally chooses the first visible page. Explicit navigation must retain its target
+        // even when a strip of the preceding page remains visible above the highlighted result.
+        _currentPage = hit.PageNumber;
     }
 }
