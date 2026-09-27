@@ -12,7 +12,7 @@ Owned .NET PDF kernel and editing libraries · SkiaSharp rendering · Avalonia �
 
 ---
 
-**Development preview — 0.1.0-alpha.4.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
+**Development preview — 0.1.0-alpha.5.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
 
 ## Reusable libraries
 
@@ -51,7 +51,7 @@ dotnet run --project samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop --n
 dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-browserwasm
 ```
 
-During review, use `feature/uno-platform` for unmerged Uno work. Source on a branch is not evidence of a deployed site or published package.
+The Uno integration is merged. The browser sample and documentation are deployed together by the Uno workflow; see its latest main-branch run for deployment status.
 
 **Native Uno Windows/Linux heads are not included in this sample.** Their stock hosts introduce non-permissive SDK metadata or video dependencies. The browser app is the Uno path on those operating systems; the native WPF/Avalonia editors remain available. Android/iOS and native WinAppSDK are not qualified here. See [Uno boundaries](docs/uno-platform.md).
 
@@ -60,6 +60,8 @@ Samples generate a real three-page PDF. No confidential PDFs, private keys or co
 ## Editor workflows
 
 The adapters share opening/saving, undo/redo, search, anchored zoom, continuous/facing/single-page layout, thumbnails and page organization. Inspectors cover comments, forms, bookmarks/links, metadata, attachments, output and comparison. Existing content can be selected individually or as a same-page selection, transformed, aligned, distributed, duplicated or deleted in one atomic revision.
+
+Selection alignment supports individual objects or translating the whole selection to page edges/centers or a selected region. Page/region alignment preserves internal spacing and uses one undoable transaction.
 
 Appearance edits preserve text fonts, positions and surrounding graphics state while changing colors, local line style, opacity or blend modes. Image replacement affects one selected invocation rather than every use of a shared resource. Wrapped text insertion/replacement is supported within explicit bounds, but is not general rich paragraph reflow. See [content editing](docs/content-editing.md) and [appearance/image editing](docs/content-appearance.md).
 
@@ -94,6 +96,8 @@ Construct UI state on its dispatcher. Viewer-only hosts can omit the editor. Eac
 ## Rendering and data integrity
 
 Metadata-based layout and binary-search virtualization select visible 512-pixel tiles. Progressive publication, cancellation and revision/generation checks reject stale results. Sampling gutters reduce fractional-scale seams. Reference-counted images remain valid while deferred scenes own them. Cache and input/output budgets are explicit, but do not constitute total native memory accounting or hostile-input isolation.
+
+Warm cached tiles bypass the parser worker; identical viewport tile plans reuse in-flight or completed work. Progressive updates retain visible matching tiles, and dispatcher notifications are coalesced. [Rendering performance](docs/performance.md) documents deterministic regression checks and remaining limits.
 
 **PDF tile rasterization is CPU Skia.** Framework compositors may use the GPU to present images. No measured speed advantage over Acrobat or fully GPU PDF interpretation is claimed.
 

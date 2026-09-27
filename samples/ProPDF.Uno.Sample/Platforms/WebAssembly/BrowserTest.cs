@@ -29,6 +29,7 @@ public static partial class BrowserTest
         using var scene = c.CaptureScene();
         writer.WriteStartObject();
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
+        writer.WriteNumber("pageWidth", w.Document?.GetPage(c.CurrentPage).Size.Width ?? 0);
         writer.WriteNumber("page", c.CurrentPage); writer.WriteNumber("zoom", c.Zoom);
         writer.WriteBoolean("dirty", w.Session.IsDirty); writer.WriteBoolean("canUndo", w.Session.CanUndo);
         writer.WriteBoolean("canRedo", w.Session.CanRedo); writer.WriteBoolean("busy", w.IsBusy);
@@ -71,6 +72,9 @@ public static partial class BrowserTest
         }
         if (Find(name) is not ComboBox box) throw new ArgumentException("Choice not found: " + name); box.SelectedIndex = index;
     }
+    [JSExport]
+    public static void Expand(string name, bool expanded)
+    { if (Find(name) is not Expander section) throw new ArgumentException("Section not found: " + name); section.IsExpanded = expanded; }
     [JSExport]
     public static void SelectObject(int index, bool extend)
     {

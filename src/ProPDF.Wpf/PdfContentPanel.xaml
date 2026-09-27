@@ -16,9 +16,11 @@
   <Button x:Name="ApplyObjectBoundsButton" Content="Apply position / size" Command="{Binding ApplyObjectBoundsCommand}"/>
   <WrapPanel><Button Content="Rotate 90°" Command="{Binding RotateObjectCommand}"/><Button Content="Flip" Command="{Binding FlipObjectCommand}"/></WrapPanel>
   <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicateObjectCommand}"/><Button Content="Delete" Command="{Binding DeleteObjectCommand}"/></WrapPanel>
-  <Expander Header="ALIGN / SPACE" Margin="0,8,0,0">
+  <Expander x:Name="AlignmentSection" Header="ALIGN / SPACE" Margin="0,8,0,0">
     <StackPanel>
-      <TextBlock Text="Uses approximate selection bounds. The first/last objects stay fixed during distribution." FontSize="11" TextWrapping="Wrap" Margin="0,4"/>
+      <TextBlock Text="Selection aligns members to each other. Page or Region moves them together, keeping spacing. Distribution keeps endpoints fixed. Bounds are approximate." FontSize="11" TextWrapping="Wrap" Margin="0,4"/>
+      <TextBlock Text="Align relative to" Margin="0,4,0,2"/>
+      <ComboBox x:Name="ContentAlignmentReferenceChoice" ItemsSource="{Binding ContentAlignmentReferences}" SelectedItem="{Binding ContentAlignmentReference, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
       <ComboBox ItemsSource="{Binding ContentAlignments}" SelectedItem="{Binding ContentAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
       <Button x:Name="AlignObjectsButton" Content="Align selected objects" Command="{Binding AlignObjectsCommand}"/>
       <ComboBox ItemsSource="{Binding ContentDistributions}" SelectedItem="{Binding ContentDistribution, Mode=TwoWay}" HorizontalAlignment="Stretch"/>

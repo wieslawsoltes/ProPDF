@@ -29,9 +29,11 @@ public sealed class PdfContentPanel : UserControl
         PdfUi.Actions(panel, ("Rotate 90°", "RotateObjectCommand"), ("Flip", "FlipObjectCommand"));
         PdfUi.Actions(panel, ("Duplicate", "DuplicateObjectCommand"), ("Delete", "DeleteObjectCommand"));
         var align = PdfUi.Stack();
+        align.Children.Add(PdfUi.Label("Selection aligns members. Page or Region moves the selection together and keeps spacing. Bounds are approximate."));
+        align.Children.Add(PdfUi.Choice("ContentAlignmentReferences", "ContentAlignmentReference", "Align relative to"));
         align.Children.Add(PdfUi.Choice("ContentAlignments", "ContentAlignment", "Alignment")); align.Children.Add(PdfUi.Button("Align objects", "AlignObjectsCommand"));
         align.Children.Add(PdfUi.Choice("ContentDistributions", "ContentDistribution", "Distribution")); align.Children.Add(PdfUi.Button("Distribute objects", "DistributeObjectsCommand"));
-        panel.Children.Add(Section("Align / space", align));
+        var alignmentSection = Section("Align / space", align); alignmentSection.Name = "AlignmentSection"; panel.Children.Add(alignmentSection);
         var appearance = PdfUi.Stack();
         appearance.Children.Add(PdfUi.Label("Select one object. Blank values preserve its appearance. Colors use #RRGGBB or #RRGGBBAA."));
         var colors = PdfUi.Stack();

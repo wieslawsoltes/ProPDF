@@ -113,6 +113,21 @@ try {
   const moved = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'inspect edited objects'));
   for (const before of [first, second]) assert.ok(Math.abs(moved.find(o => o.text === before.text).x - before.x - 12) < .1);
   await command('UndoButton'); checks.push('atomic native multi-selection editing and single undo');
+  objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'objects before page alignment'));
+  const members = objects.filter(o => o.text === 'Your documents.' || o.text === 'Your workspace.');
+  await bounded(page.evaluate(({a,b}) => { propdfTest.SelectObject(a, false); propdfTest.SelectObject(b, true); }, {a: members[0].index, b: members[1].index}), 'alignment selection');
+  await bounded(page.evaluate(() => propdfTest.Expand('AlignmentSection', true)), 'expand alignment');
+  await page.waitForTimeout(150);
+  const alignmentPageWidth = (await state()).pageWidth;
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentAlignmentReferenceChoice', 1)), 'page reference');
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentAlignmentChoice', 1)), 'horizontal center');
+  await command('AlignObjectsButton');
+  const aligned = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'page-aligned PDF content')).filter(o => members.some(m => m.text === o.text));
+  // Inspect resulting PDF objects against the document page size, not UI draft values.
+  const left = Math.min(...aligned.map(o => o.x)), right = Math.max(...aligned.map(o => o.x + o.width));
+  assert.ok(Math.abs((left + right) / 2 - alignmentPageWidth / 2) < .1);
+  assert.ok(Math.abs(aligned[1].x - aligned[0].x - members[1].x + members[0].x) < .1);
+  await command('UndoButton'); checks.push('page-relative group alignment through native controls and undo');
   objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'restored objects'));
   await bounded(page.evaluate(i => propdfTest.SelectObject(i, false), objects.find(o => o.text === 'Your documents.').index), 'appearance selection');
   await text('ContentFillColorInput', '#D040A0'); await command('ApplyAppearanceButton');

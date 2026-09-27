@@ -9,6 +9,7 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
     private readonly ISkiaPdfDocumentFactory _factory;
     private readonly SkiaRendererOptions _options;
     private readonly SemaphoreSlim _worker = new(1, 1);
+    private readonly object _tileGate = new();
     private readonly Dictionary<(Guid, SkiaTileRequest), TileEntry> _tiles = [];
     private readonly LinkedList<(Guid, SkiaTileRequest)> _tileLru = [];
     private readonly Dictionary<(Guid, int), PictureEntry> _pictures = [];
@@ -38,41 +39,62 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         request.Validate(snapshot, _options.MaximumTileEdge);
+        cancellationToken.ThrowIfCancellationRequested();
+        var key = (snapshot.Id, request);
+        // Immutable, reference-counted tiles are independent of the interpreter worker.
+        // A warm viewport must not wait for another page's parsing or rasterization.
+        lock (_tileGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (AcquireCachedTile(key) is { } warm) return warm;
+        }
         await _worker.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            cancellationToken.ThrowIfCancellationRequested();
-            var key = (snapshot.Id, request);
-            if (_tiles.TryGetValue(key, out var cached))
+            lock (_tileGate)
             {
-                _tileLru.Remove(cached.Node);
-                _tileLru.AddLast(cached.Node);
-                _hits++;
-                return new SkiaTileLease(cached.Image, request);
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                cancellationToken.ThrowIfCancellationRequested();
+                // Another queued request may have populated this tile while we waited.
+                if (AcquireCachedTile(key) is { } warm) return warm;
+                _misses++;
             }
-            _misses++;
-            // Task.Run is deliberately inside the asynchronous semaphore: queued requests do not occupy thread-pool threads.
             var image = await Task.Run(() => Rasterize(snapshot, request, cancellationToken), cancellationToken).ConfigureAwait(false);
             var shared = new SharedSkiaImage(image);
             SkiaTileLease? lease = null;
+            var cached = false;
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                lease = new SkiaTileLease(shared, request);
-                _tiles.Add(key, new TileEntry(shared, _tileLru.AddLast(key)));
-                _bytes += shared.ByteLength;
-                TrimTiles();
+                lock (_tileGate)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    lease = new SkiaTileLease(shared, request);
+                    _tiles.Add(key, new TileEntry(shared, _tileLru.AddLast(key)));
+                    cached = true;
+                    _bytes += shared.ByteLength;
+                    TrimTiles();
+                }
                 return lease;
             }
             catch
             {
                 lease?.Dispose();
-                if (!_tiles.ContainsKey(key)) shared.Release();
+                if (!cached) shared.Release();
                 throw;
             }
         }
         finally { _worker.Release(); }
+    }
+
+    // The caller holds _tileGate. Retain before releasing the lock, so eviction
+    // and renderer disposal cannot invalidate a successfully acquired lease.
+    private SkiaTileLease? AcquireCachedTile((Guid, SkiaTileRequest) key)
+    {
+        if (!_tiles.TryGetValue(key, out var cached)) return null;
+        _tileLru.Remove(cached.Node);
+        _tileLru.AddLast(cached.Node);
+        _hits++;
+        return new SkiaTileLease(cached.Image, key.Item2);
     }
 
     private SKImage Rasterize(PdfSnapshot snapshot, SkiaTileRequest request, CancellationToken cancellationToken)
@@ -173,7 +195,11 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
     public async Task<SkiaRendererStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default)
     {
         await _worker.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { return new SkiaRendererStatistics(_hits, _misses, _bytes, _tiles.Count, _pictures.Count, _documents.Count, _pictureBytes); }
+        try
+        {
+            lock (_tileGate)
+                return new SkiaRendererStatistics(_hits, _misses, _bytes, _tiles.Count, _pictures.Count, _documents.Count, _pictureBytes);
+        }
         finally { _worker.Release(); }
     }
 
@@ -182,18 +208,21 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
         await _worker.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (_disposed) return;
-            _disposed = true;
-            foreach (var entry in _tiles.Values) entry.Image.Release();
+            lock (_tileGate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                foreach (var entry in _tiles.Values) entry.Image.Release();
+                _tiles.Clear();
+                _tileLru.Clear();
+                _bytes = 0;
+            }
             foreach (var entry in _pictures.Values) entry.Picture.Dispose();
             foreach (var entry in _documents.Values) entry.Document.Dispose();
-            _tiles.Clear();
             _pictures.Clear();
             _documents.Clear();
-            _tileLru.Clear();
             _pictureLru.Clear();
             _documentLru.Clear();
-            _bytes = 0;
             _pictureBytes = 0;
         }
         finally { _worker.Release(); }

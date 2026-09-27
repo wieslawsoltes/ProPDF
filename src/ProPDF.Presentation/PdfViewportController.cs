@@ -19,6 +19,9 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
     private CancellationTokenSource? _renderCancellation;
     private Task _lastRender = Task.CompletedTask;
     private long _generation;
+    private Guid? _plannedRevision;
+    private SkiaTileRequest[] _plannedRequests = [];
+    private int _notificationQueued;
     private PdfSnapshot? _snapshot;
     private PdfPageLayout? _layout;
     private Dictionary<int, PdfPagePlacement> _placements = [];
@@ -219,36 +222,89 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
     public (int PageNumber, PdfPoint Point)? HitTest(PdfPoint viewportPoint) { lock (_gate) return HitTestLocked(viewportPoint); }
     private (int PageNumber, PdfPoint Point)? HitTestLocked(PdfPoint point) => _layout?.HitTest(new PdfPoint(point.X + _offset.X, point.Y + _offset.Y));
 
-    private sealed record RenderState(long Generation, PdfSnapshot Document, PdfPageLayout Layout, PdfRect Viewport, double PixelsPerPoint);
+    private sealed record RenderState(long Generation, PdfSnapshot Document, SkiaTileRequest[] Requests);
     private void ScheduleRender()
     {
-        CancellationTokenSource? previous;
+        CancellationTokenSource? previous = null;
         lock (_gate)
         {
             if (_disposed) return;
-            previous = _renderCancellation;
-            _renderCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-            var cancellation = _renderCancellation;
-            var generation = ++_generation;
-            _isRendering = _snapshot is not null;
-            if (_snapshot is null || _layout is null)
+            SkiaTileRequest[] requests = [];
+            var planFailed = false;
+            try
             {
-                _lastRender = Task.CompletedTask;
-                cancellation.Dispose();
+                if (_snapshot is not null && _layout is not null)
+                    requests = PlanTiles(_snapshot, _layout,
+                        new PdfRect(_offset.X, _offset.Y, _viewport.Width, _viewport.Height),
+                        Math.Min(64, _layout.Scale * _pixelsPerDip));
             }
-            else
+            catch (Exception error)
             {
-                var state = new RenderState(generation, _snapshot, _layout,
-                    new PdfRect(_offset.X, _offset.Y, _viewport.Width, _viewport.Height), Math.Min(64, _layout.Scale * _pixelsPerDip));
-                var task = Task.Run(() => RenderAsync(state, cancellation));
-                _lastRender = task;
-                _pending.Add(task);
-                _ = task.ContinueWith(completed => { lock (_gate) _pending.Remove(completed); }, CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                previous = _renderCancellation;
+                _renderCancellation = null;
+                _plannedRevision = null;
+                _plannedRequests = [];
+                _lastRender = Task.CompletedTask;
+                _generation++;
+                _isRendering = false;
+                _renderError = error.Message;
+                planFailed = true;
+            }
+
+            // Scrolling within the same device-space tiles only changes composition.
+            // Reuse an in-flight plan as well as a completed one; do not cancel its work.
+            if (!planFailed && (_plannedRevision != _snapshot?.Id || _renderError is not null ||
+                !_plannedRequests.AsSpan().SequenceEqual(requests)))
+            {
+                previous = _renderCancellation;
+                _renderCancellation = null;
+                _plannedRevision = _snapshot?.Id;
+                _plannedRequests = requests;
+                var generation = ++_generation;
+                _isRendering = _snapshot is not null;
+                if (_snapshot is null)
+                {
+                    _lastRender = Task.CompletedTask;
+                }
+                else
+                {
+                    var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+                    _renderCancellation = cancellation;
+                    var state = new RenderState(generation, _snapshot, requests);
+                    var task = Task.Run(() => RenderAsync(state, cancellation));
+                    _lastRender = task;
+                    _pending.Add(task);
+                    _ = task.ContinueWith(completed => { lock (_gate) _pending.Remove(completed); }, CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
             }
         }
         Cancel(previous);
         Notify();
+    }
+
+    private static SkiaTileRequest[] PlanTiles(PdfSnapshot document, PdfPageLayout layout, PdfRect viewport, double scale)
+    {
+        var requests = new List<SkiaTileRequest>();
+        const int edge = 512;
+        foreach (var placement in layout.GetVisible(viewport))
+        {
+            var visible = placement.Bounds.Intersect(viewport);
+            var page = document.GetPage(placement.PageNumber);
+            var left = (visible.X - placement.Bounds.X) / layout.Scale * scale;
+            var top = (visible.Y - placement.Bounds.Y) / layout.Scale * scale;
+            var right = (visible.Right - placement.Bounds.X) / layout.Scale * scale;
+            var bottom = (visible.Bottom - placement.Bounds.Y) / layout.Scale * scale;
+            for (var y = (int)Math.Floor(top / edge) * edge; y < bottom; y += edge)
+                for (var x = (int)Math.Floor(left / edge) * edge; x < right; x += edge)
+                {
+                    var clip = new PdfRect(Math.Max(0, x / scale), Math.Max(0, y / scale),
+                        Math.Min(edge / scale, page.Size.Width - x / scale), Math.Min(edge / scale, page.Size.Height - y / scale));
+                    if (!clip.IsEmpty) requests.Add(new SkiaTileRequest(placement.PageNumber, clip, scale));
+                    if (requests.Count > 256) throw new InvalidOperationException("The viewport exceeds the 256-tile rendering budget. Reduce display scaling or window size.");
+                }
+        }
+        return requests.ToArray();
     }
 
     private async Task RenderAsync(RenderState state, CancellationTokenSource cancellation)
@@ -257,33 +313,14 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
         var token = cancellation.Token;
         try
         {
-            var requests = new List<SkiaTileRequest>();
-            const int edge = 512;
-            foreach (var placement in state.Layout.GetVisible(state.Viewport))
-            {
-                var visible = placement.Bounds.Intersect(state.Viewport);
-                var page = state.Document.GetPage(placement.PageNumber);
-                var scale = state.PixelsPerPoint;
-                var left = (visible.X - placement.Bounds.X) / state.Layout.Scale * scale;
-                var top = (visible.Y - placement.Bounds.Y) / state.Layout.Scale * scale;
-                var right = (visible.Right - placement.Bounds.X) / state.Layout.Scale * scale;
-                var bottom = (visible.Bottom - placement.Bounds.Y) / state.Layout.Scale * scale;
-                for (var y = (int)Math.Floor(top / edge) * edge; y < bottom; y += edge)
-                    for (var x = (int)Math.Floor(left / edge) * edge; x < right; x += edge)
-                    {
-                        var clip = new PdfRect(Math.Max(0, x / scale), Math.Max(0, y / scale),
-                            Math.Min(edge / scale, page.Size.Width - x / scale), Math.Min(edge / scale, page.Size.Height - y / scale));
-                        if (!clip.IsEmpty) requests.Add(new SkiaTileRequest(placement.PageNumber, clip, scale));
-                        if (requests.Count > 256) throw new InvalidOperationException("The viewport exceeds the 256-tile rendering budget. Reduce display scaling or window size.");
-                    }
-            }
-            for (var i = 0; i < requests.Count; i++)
+            var requests = state.Requests;
+            for (var i = 0; i < requests.Length; i++)
             {
                 token.ThrowIfCancellationRequested();
                 rendered.Add(await _renderer.RenderTileAsync(state.Document, requests[i], token).ConfigureAwait(false));
-                if (i == 0 || i % 4 == 3 || i == requests.Count - 1) PublishTiles(state, rendered);
+                if (i == 0 || i % 4 == 3 || i == requests.Length - 1) PublishTiles(state, rendered);
             }
-            if (requests.Count == 0) PublishTiles(state, rendered);
+            if (requests.Length == 0) PublishTiles(state, rendered);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error)
@@ -305,6 +342,15 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
         {
             if (_disposed || state.Generation != _generation || _snapshot?.Id != state.Document.Id) return;
             var leases = rendered.Select(tile => tile.Retain()).ToList();
+            // Progressive publication must not erase already visible tiles that the
+            // current plan still needs. Keep only exact-revision, exact-scale matches.
+            if (_tileRevision == state.Document.Id)
+            {
+                var missing = state.Requests.ToHashSet();
+                foreach (var tile in rendered) missing.Remove(tile.Request);
+                foreach (var tile in _tiles)
+                    if (missing.Remove(tile.Request)) leases.Add(tile.Retain());
+            }
             foreach (var tile in _tiles) tile.Dispose();
             _tiles = leases;
             _tileRevision = state.Document.Id;
@@ -377,12 +423,23 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
         }
     }
 
-    private void Notify() => _dispatch(() =>
+    private void Notify()
     {
-        lock (_gate) if (_disposed) return;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
-        Invalidated?.Invoke(this, EventArgs.Empty);
-    });
+        // Progressive tiles and input can arrive faster than a dispatcher frame.
+        // Consumers read current state, so one queued notification is sufficient.
+        if (Interlocked.Exchange(ref _notificationQueued, 1) != 0) return;
+        try
+        {
+            _dispatch(() =>
+            {
+                Interlocked.Exchange(ref _notificationQueued, 0);
+                lock (_gate) if (_disposed) return;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+                Invalidated?.Invoke(this, EventArgs.Empty);
+            });
+        }
+        catch { Interlocked.Exchange(ref _notificationQueued, 0); throw; }
+    }
     public void ReportError(Exception error) { lock (_gate) _lastError = error.Message; Notify(); }
     /// <summary>Clears an editing/host diagnostic without discarding active rendering failures.</summary>
     public void ClearError() { lock (_gate) _lastError = null; Notify(); }

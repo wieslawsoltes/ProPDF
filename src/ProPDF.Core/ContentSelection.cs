@@ -84,6 +84,30 @@ public static class PdfContentSelection
             return new TransformContentObject(o.Reference, PdfAffineTransform.Translation(dx, dy));
         }));
     }
+    /// <summary>Aligns the logical union to an explicit page-coordinate rectangle without changing member spacing.</summary>
+    /// <remarks>Supports one or more same-page objects. This translates; it does not resize, clip, or sanitize content.</remarks>
+    public static EditContentObjects AlignToBounds(IEnumerable<PdfContentObject> objects, PdfRect target, PdfSelectionAlignment alignment)
+    {
+        if (!Enum.IsDefined(alignment)) throw new ArgumentOutOfRangeException(nameof(alignment));
+        if (target.IsEmpty) throw new ArgumentException("The alignment target must have positive width and height.", nameof(target));
+        var items = Capture(objects); var bounds = Union(items);
+        // Subtract origins before adding half-extents: avoid unnecessary overflow
+        // when large but valid coordinates share a distant origin.
+        var dx = alignment switch
+        {
+            PdfSelectionAlignment.Left => target.X - bounds.X,
+            PdfSelectionAlignment.HorizontalCenter => target.X - bounds.X + (target.Width - bounds.Width) / 2,
+            PdfSelectionAlignment.Right => target.Right - bounds.Right, _ => 0
+        };
+        var dy = alignment switch
+        {
+            PdfSelectionAlignment.Top => target.Y - bounds.Y,
+            PdfSelectionAlignment.VerticalCenter => target.Y - bounds.Y + (target.Height - bounds.Height) / 2,
+            PdfSelectionAlignment.Bottom => target.Bottom - bounds.Bottom, _ => 0
+        };
+        var transform = PdfAffineTransform.Translation(dx, dy); transform.Validate();
+        return new(items.Select(o => new TransformContentObject(o.Reference, transform)));
+    }
     public static EditContentObjects Distribute(IEnumerable<PdfContentObject> objects, PdfSelectionDistribution distribution)
     {
         if (!Enum.IsDefined(distribution)) throw new ArgumentOutOfRangeException(nameof(distribution));

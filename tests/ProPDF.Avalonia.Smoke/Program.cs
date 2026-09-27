@@ -117,6 +117,24 @@ internal static class Program
             Pump(workspace.UndoCommand.ExecuteAsync());
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Kind == PdfContentObjectKind.Text && item.Text is "Your documents." or "Your workspace."));
+            contentPanel.FindControl<Expander>("AlignmentSection")!.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+            var alignmentChoice = contentPanel.FindControl<ComboBox>("ContentAlignmentReferenceChoice")!;
+            var alignmentButton = contentPanel.FindControl<Button>("AlignObjectsButton")!;
+            alignmentChoice.SelectedItem = ProPDF.Presentation.PdfContentAlignmentReference.Page;
+            if (workspace.ContentAlignmentReference != ProPDF.Presentation.PdfContentAlignmentReference.Page)
+                throw new InvalidOperationException("Native page-alignment reference is not bound.");
+            var alignmentRevision = runtime.Session.Current!;
+            workspace.ContentAlignment = PdfSelectionAlignment.HorizontalCenter;
+            Pump(((ProPDF.Presentation.PdfUiCommand)alignmentButton.Command!).ExecuteAsync());
+            var alignedInspection = runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1); Pump(alignedInspection);
+            var alignedBounds = PdfContentSelection.Bounds(alignedInspection.Result.Objects.Where(item => item.Text is "Your documents." or "Your workspace."));
+            if (Math.Abs(alignedBounds.X + alignedBounds.Width / 2 - alignmentRevision.GetPage(1).Size.Width / 2) > .01)
+                throw new InvalidOperationException("Native page alignment did not center the PDF content.");
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            if (!ReferenceEquals(runtime.Session.Current, alignmentRevision)) throw new InvalidOperationException("Alignment was not one undoable edit.");
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Kind == PdfContentObjectKind.Text && item.Text is "Your documents." or "Your workspace."));
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("The search command found no sample text.");
