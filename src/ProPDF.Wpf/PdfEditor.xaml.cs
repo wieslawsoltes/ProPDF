@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
+using ProPDF.Core;
 using ProPDF.Presentation;
 
 namespace ProPDF.Wpf;
@@ -16,6 +17,7 @@ public sealed partial class PdfEditor : UserControl
     {
         InitializeComponent();
         PdfOutputToolbar.Install(this);
+        PdfNavigationPanel.Install(this);
         Loaded += (_, _) => { if (Workspace is null && Context is not null) ResetWorkspace(); };
         Unloaded += (_, _) => { Workspace?.Dispose(); Workspace = null; DataContext = null; };
     }
@@ -26,7 +28,7 @@ public sealed partial class PdfEditor : UserControl
         DataContext = Workspace;
     }
 
-    private sealed class Dialogs(PdfEditor owner) : IPdfWorkspaceDialogs
+    private sealed class Dialogs(PdfEditor owner) : IPdfWorkspaceDialogs, IPdfExternalNavigation
     {
         public Task<string?> PickOpenPathAsync(PdfFileKind kind, CancellationToken cancellationToken)
         {
@@ -88,6 +90,13 @@ public sealed partial class PdfEditor : UserControl
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (text.Length != 0) Clipboard.SetText(text);
+            return Task.CompletedTask;
+        }
+        public Task OpenUriAsync(Uri uri, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!PdfUriPolicy.TryNormalize(uri.AbsoluteUri, out var safe)) throw new InvalidOperationException("URI blocked by the document navigation policy.");
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(safe!.AbsoluteUri) { UseShellExecute = true });
             return Task.CompletedTask;
         }
     }
