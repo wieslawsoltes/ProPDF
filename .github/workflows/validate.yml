@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.1.0-alpha.3'
+        default: '0.1.0-alpha.4'
       artifact-prefix:
         type: string
         default: validation
