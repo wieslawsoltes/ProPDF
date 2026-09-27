@@ -1,0 +1,14 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <IsPackable>true</IsPackable>
+    <GenerateLibraryLayout>true</GenerateLibraryLayout>
+    <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
+    <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <LangVersion>14.0</LangVersion>
+    <Description>Reusable Uno Platform PDF viewer, lazy thumbnails and editor shell using shared ProPDF presentation and Skia scenes.</Description>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" /></ItemGroup>
+</Project>

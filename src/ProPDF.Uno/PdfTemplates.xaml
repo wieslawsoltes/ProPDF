@@ -1,0 +1,9 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:ProPDF.Uno" x:Class="ProPDF.Uno.PdfTemplates">
+  <DataTemplate x:Key="PageThumbnailTemplate">
+    <StackPanel Spacing="4" HorizontalAlignment="Center" Margin="0,6">
+      <local:PdfThumbnail Controller="{Binding Controller}" PageNumber="{Binding Number}"/>
+      <TextBlock Text="{Binding Label}" FontSize="11" HorizontalAlignment="Center"/>
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

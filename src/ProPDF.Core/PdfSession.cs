@@ -122,7 +122,13 @@ public sealed class PdfSession
         return true;
     }
 
-    public async Task SaveAsAsync(string path, CancellationToken cancellationToken = default)
+    public Task SaveAsAsync(string path, CancellationToken cancellationToken = default) =>
+        SaveAndPublishAsync(path, null, cancellationToken);
+
+    /// <summary>Save privately, then publish through a host transfer before marking this revision saved.
+    /// Browser downloads and StorageFile providers use this without pretending a temporary file is the destination.</summary>
+    public async Task SaveAndPublishAsync(string path, Func<string, CancellationToken, Task>? publish,
+        CancellationToken cancellationToken = default)
     {
         PdfSnapshot snapshot;
         await _commands.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -130,6 +136,7 @@ public sealed class PdfSession
         {
             snapshot = Current ?? throw new InvalidOperationException("No document is open.");
             await PdfStreams.SaveAtomicAsync(snapshot, path, cancellationToken).ConfigureAwait(false);
+            if (publish is not null) await publish(Path.GetFullPath(path), cancellationToken).ConfigureAwait(false);
             lock (_state)
             {
                 _savedId = snapshot.Id;

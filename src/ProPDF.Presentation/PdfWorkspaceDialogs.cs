@@ -24,3 +24,12 @@ public sealed class PdfUiCommand(Func<Task> execute, Func<bool> canExecute) : IC
 }
 
 public sealed record PdfToolDescriptor(PdfTool Tool, string Title);
+
+/// <summary>Optional file-provider handoff. Desktop path-only hosts do not need to implement it.</summary>
+public interface IPdfWorkspaceFileTransfer
+{
+    /// <summary>Imported staging paths must never become implicit save destinations.</summary>
+    bool AlwaysPickSaveDestination { get; }
+    /// <summary>Complete the user-selected export. Throw on failure; do not claim a temporary write was a save.</summary>
+    Task PublishFileAsync(string stagedPath, CancellationToken cancellationToken);
+}

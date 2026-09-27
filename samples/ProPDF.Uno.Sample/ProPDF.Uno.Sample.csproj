@@ -1,0 +1,28 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
+    <TargetFramework />
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
+    <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <LangVersion>14.0</LangVersion>
+    <ApplicationTitle>ProPDF Uno</ApplicationTitle>
+    <ApplicationId>org.propdf.uno</ApplicationId>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationPublisher>ProPDF</ApplicationPublisher>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>
+    <WasmShellWebAppBasePath>/ProPDF/</WasmShellWebAppBasePath>
+    <WasmShellGenerateCompressedFiles>false</WasmShellGenerateCompressedFiles>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(TargetFramework.Contains('browserwasm'))"><DefineConstants>$(DefineConstants);BROWSER_WASM</DefineConstants></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/ProPDF.Uno/ProPDF.Uno.csproj" />
+    <ProjectReference Include="../ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
+    <Content Include="browser-host.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

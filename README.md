@@ -141,3 +141,15 @@ Revisions, input validation, pixel budgets and undo apply to these operations. Z
 ### Multi-object editing
 
 The Edit inspector and canvas support same-page multiple selection, atomic group transforms, duplication/deletion, alignment and distribution. All selected handles are checked against one original inspection, preserving painting order and one-step undo. See [multi-object selection](docs/content-editing.md#multi-object-selection-and-atomic-editing) for the 1,000-object limit, approximate-bound behavior and unsupported cases.
+
+## Uno Platform and browser sample
+
+`ProPDF.Uno` adds native Uno Skia viewer, thumbnail and full shared-workspace editor controls. The .NET 10 sample uses Uno.Sdk 6.7.30 and targets browser WebAssembly and Skia desktop. Open/edit/search/annotate/organize/inspect/export locally, with browser import/download handling and no PDF upload. Read [Uno integration, workflows and browser limits](docs/uno-platform.md).
+
+```sh
+dotnet workload install wasm-tools
+dotnet run --project samples/ProPDF.Uno.Sample -f net10.0-desktop
+dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-browserwasm
+```
+
+The dedicated Uno workflow stages the actual app at the GitHub project-site root and documentation at `docs/`, validates it in Chromium, and deploys only main. This replaces the docs-only deployment. Publication is verified from the workflow, not assumed from a configured URL.

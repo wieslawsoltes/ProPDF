@@ -1,6 +1,6 @@
 site_name: ProPDF
 site_description: Modular .NET PDF viewing and editing with SkiaSharp, Avalonia and WPF.
-site_url: https://wieslawsoltes.github.io/ProPDF/
+site_url: https://wieslawsoltes.github.io/ProPDF/docs/
 repo_url: https://github.com/wieslawsoltes/ProPDF
 repo_name: wieslawsoltes/ProPDF
 site_dir: artifacts/site
@@ -34,6 +34,7 @@ markdown_extensions:
       permalink: true
 nav:
   - Overview: index.md
+  - Uno Platform: uno-platform.md
   - Getting started: getting-started.md
   - Feature matrix: features.md
   - Owned PDF engine: owned-engine.md

@@ -3,7 +3,7 @@ param([string]$PackageDirectory = 'artifacts/packages')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $feed = (Resolve-Path $PackageDirectory).Path
-$ids = @('ProPDF.Kernel','ProPDF.Core','ProPDF.Rendering.Skia','ProPDF.Engine.PdfPig','ProPDF.Editing','ProPDF.Presentation','ProPDF.Avalonia','ProPDF.Wpf')
+$ids = @('ProPDF.Kernel','ProPDF.Core','ProPDF.Rendering.Skia','ProPDF.Engine.PdfPig','ProPDF.Editing','ProPDF.Presentation','ProPDF.Avalonia','ProPDF.Wpf','ProPDF.Uno')
 $packages = @(Get-ChildItem $feed -Filter '*.nupkg')
 if ($packages.Count -ne $ids.Count) { throw "Expected $($ids.Count) packages; found $($packages.Count)." }
 $versions = @{}
@@ -40,16 +40,18 @@ function Invoke-DotNet([string[]]$Arguments) {
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) { throw "dotnet $($Arguments[0]) failed: $LASTEXITCODE" }
 }
-function New-Consumer([string]$Name,[string]$Framework,[string[]]$References,[string]$Code,[bool]$Executable=$false,[bool]$Wpf=$false) {
+function New-Consumer([string]$Name,[string]$Framework,[string[]]$References,[string]$Code,[bool]$Executable=$false,[bool]$Wpf=$false,[bool]$Uno=$false) {
     $directory = Join-Path $work $Name
     New-Item $directory -ItemType Directory | Out-Null
     $refs = ($References | ForEach-Object { "<PackageReference Include=`"$_`" Version=`"$version`" />" }) -join "`n"
     $native = if ($Executable) { '<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" /><PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.3" />' } else { '' }
     $output = if ($Executable) { 'Exe' } else { 'Library' }
     $useWpf = if ($Wpf) { '<UseWPF>true</UseWPF>' } else { '' }
+    $sdk = if ($Uno) { 'Uno.Sdk/6.7.30' } else { 'Microsoft.NET.Sdk' }
+    $unoProperties = if ($Uno) { '<UnoFeatures>Skia;SkiaRenderer</UnoFeatures><SkiaSharpVersion>3.119.4</SkiaSharpVersion><GenerateLibraryLayout>true</GenerateLibraryLayout>' } else { '' }
     @"
-<Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup><TargetFramework>$Framework</TargetFramework><OutputType>$output</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><EnableWindowsTargeting>true</EnableWindowsTargeting><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally><UseSharedCompilation>false</UseSharedCompilation>$useWpf</PropertyGroup>
+<Project Sdk="$sdk">
+<PropertyGroup><TargetFramework>$Framework</TargetFramework><OutputType>$output</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><EnableWindowsTargeting>true</EnableWindowsTargeting><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally><UseSharedCompilation>false</UseSharedCompilation>$useWpf $unoProperties</PropertyGroup>
 <ItemGroup>$refs $native</ItemGroup>
 </Project>
 "@ | Set-Content (Join-Path $directory "$Name.csproj") -Encoding utf8
@@ -87,13 +89,14 @@ Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rende
     $engine = New-Consumer -Name EngineConsumer -Framework net8.0 -References $ids[0..5] -Code $code -Executable $true
     $avalonia = New-Consumer -Name AvaloniaConsumer -Framework net8.0 -References @('ProPDF.Avalonia') -Code 'public static class Consumer { public static ProPDF.Avalonia.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     $wpf = New-Consumer -Name WpfConsumer -Framework net8.0-windows -References @('ProPDF.Wpf') -Wpf $true -Code 'public static class Consumer { public static ProPDF.Wpf.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
-    foreach ($project in @($engine,$avalonia,$wpf)) {
+    $uno = New-Consumer -Name UnoConsumer -Framework net10.0 -References @('ProPDF.Uno') -Uno $true -Code 'public static class Consumer { public static ProPDF.Uno.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; public static ProPDF.Uno.PdfView CreateView() => new(); }'
+    foreach ($project in @($engine,$avalonia,$wpf,$uno)) {
         Invoke-DotNet -Arguments @('restore',$project,'--disable-build-servers','--configfile',(Join-Path $work 'NuGet.Config'))
         Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore','--disable-build-servers','-p:UseSharedCompilation=false')
     }
     Invoke-DotNet -Arguments @('run','--project',$engine,'-c','Release','--no-build')
     if (@(Get-ChildItem (Join-Path $work 'EngineConsumer/bin') -Recurse -Filter NOTICE.txt | Where-Object { $_.DirectoryName -match 'PdfPig.Skia' }).Count -eq 0) { throw 'Packaged renderer notices were not copied to consumer output.' }
-    Write-Host "PASS: all eight standalone packages at $version."
+    Write-Host "PASS: all nine standalone packages at $version."
 } finally {
     $env:MSBUILDDISABLENODEREUSE = $previousNodeReuse
     # Antivirus or third-party build services may briefly retain the temporary directory on Windows.
