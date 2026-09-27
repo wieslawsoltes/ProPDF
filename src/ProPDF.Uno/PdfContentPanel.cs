@@ -34,11 +34,15 @@ public sealed class PdfContentPanel : UserControl
         panel.Children.Add(Section("Align / space", align));
         var appearance = PdfUi.Stack();
         appearance.Children.Add(PdfUi.Label("Select one object. Blank values preserve its appearance. Colors use #RRGGBB or #RRGGBBAA."));
-        var colors = PdfUi.Stack(); PdfUi.Bind(colors, IsEnabledProperty, "CanSetContentColors");
+        var colors = PdfUi.Stack();
         PdfUi.Field(colors, "Fill / text color", "ContentFillColor"); PdfUi.Field(colors, "Stroke color", "ContentStrokeColor");
         PdfUi.Field(colors, "Line width", "ContentLineWidth"); PdfUi.Field(colors, "Dash lengths, or solid", "ContentDash");
         colors.Children.Add(PdfUi.Choice("ContentLineCaps", "ContentCap", "Line cap")); colors.Children.Add(PdfUi.Choice("ContentLineJoins", "ContentJoin", "Line join"));
-        appearance.Children.Add(colors);
+        // IsEnabled is a Control property in Uno, not a Panel property. A control
+        // wrapper both owns the binding and propagates disabled state to its fields.
+        var colorGroup = new ContentControl { Content = colors, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        PdfUi.Bind(colorGroup, Control.IsEnabledProperty, "CanSetContentColors");
+        appearance.Children.Add(colorGroup);
         var painting = PdfUi.Choice("ContentPaintModes", "ContentPainting", "Path painting"); PdfUi.Bind(painting, IsEnabledProperty, "CanSetContentPainting"); appearance.Children.Add(painting);
         PdfUi.Field(appearance, "Opacity · 0–100%", "ContentOpacity"); appearance.Children.Add(PdfUi.Choice("ContentBlendModes", "ContentBlend", "Blend mode"));
         appearance.Children.Add(PdfUi.Button("Apply appearance", "ApplyAppearanceCommand")); panel.Children.Add(Section("Appearance", appearance, true));
