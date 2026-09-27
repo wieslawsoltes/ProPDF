@@ -27,3 +27,7 @@ There is no remaining package-scoped NU1701 suppression for a legacy PDF engine.
 ## Primary sources
 
 [SkiaSharp](https://github.com/mono/SkiaSharp), [PdfPig](https://github.com/UglyToad/PdfPig), [PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia), [Avalonia](https://github.com/AvaloniaUI/Avalonia), [ANGLE license](https://chromium.googlesource.com/angle/angle/+/main/LICENSE), [xUnit abstractions license](https://github.com/xunit/abstractions.xunit/blob/main/license.txt), [.NET runtime license](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT).
+
+## Source-pinned compatibility code
+
+The optional rendering assembly now compiles attributed Apache-2.0 PdfPig.Rendering.Skia source pinned to the prior package's exact commit, with narrow image-paint and compilation corrections. It is not owned interpreter code. Its NuGet license expression is `MIT AND Apache-2.0`; original notices and source provenance are packaged and copied to application output. The other ProPDF-authored libraries retain MIT. See [Appearance and images](content-appearance.md) and the root third-party notices for the source pin and distribution details.

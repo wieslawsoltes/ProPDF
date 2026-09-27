@@ -78,6 +78,7 @@ public sealed partial class PdfWorkspace
         var item = SelectedContentObject;
         if (_contentEditorReference == item?.Reference) return;
         _contentEditorReference = item?.Reference;
+        ResetAppearanceDraft(item);
         if (item is null) return;
         static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
         _contentX = Number(item.Bounds.X); _contentY = Number(item.Bounds.Y); _contentWidth = Number(item.Bounds.Width); _contentHeight = Number(item.Bounds.Height);

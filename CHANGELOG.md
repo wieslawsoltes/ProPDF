@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.3 — Unreleased
+
+Owned per-object text/path appearance patches (colors, width/cap/join/dashes, painting, opacity/blend), per-invocation image replacement/interpolation, bounded static sRGB/straight-alpha authoring and all eight EXIF orientations; shared Avalonia/WPF controls and stale-dialog protection. Optional source-pinned Apache-2.0 rendering compatibility fixes regular-image opacity and nearest/linear sampling without modifying saved PDFs. Preserved license/NOTICE/provenance, source-drift gates and output-notice propagation; no commercial/copyleft dependency additions. This is not full Acrobat/conformance/color-management qualification.
+
+
 ## Unreleased — existing content editing
 
 Owned content inspection and revision-bound native transforms, duplication, deletion, visual clipping and wrapped text replacement; shared object selection/drag/corner-resize controls and Edit inspectors for Avalonia/WPF; state-preservation and overflow checks; fractional-scale tile sampling corrections and an approximate display-list byte budget. Includes native command-binding checks and independent parsing/pixel/interaction regressions. Supported paint groups and conservative exclusions are documented in `docs/content-editing.md`; full Acrobat paragraph editing is not claimed.

@@ -36,7 +36,7 @@ public enum PdfContentObjectKind { Text, Path, Image, Form, Shading }
 /// <summary>A revision-bound handle, not a durable PDF object number. Re-inspect after modifying a page.</summary>
 public sealed record PdfContentObjectReference(Guid Revision, int PageNumber, string Fingerprint, int Index);
 public sealed record PdfContentObject(PdfContentObjectReference Reference, PdfContentObjectKind Kind, PdfRect Bounds,
-    string? Text = null, string? ResourceName = null, string? ReadOnlyReason = null)
+    string? Text = null, string? ResourceName = null, string? ReadOnlyReason = null, PdfContentImageInfo? ImageInfo = null)
 {
     public bool CanEdit => ReadOnlyReason is null;
     public override string ToString() => $"{Reference.Index + 1}. {Kind}" + (Text is { Length: > 0 } text ? " — " + text[..Math.Min(48, text.Length)].Replace('\n', ' ') : "");

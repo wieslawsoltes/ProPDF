@@ -1,8 +1,6 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using ProPDF.Core;
 using ProPDF.Kernel;
-using SkiaSharp;
 using static ProPDF.Editing.PdfGraph;
 using static ProPDF.Kernel.PdfValues;
 
@@ -32,28 +30,11 @@ public sealed partial class ManagedPdfEditor
                 .Append(F(text.Baseline.Y + i * text.FontSize * 1.2)).Append(" Tm\n").Append(Hex(font.Encode(lines[i]))).Append(" Tj\nET\n");
         content.Append("Q\n"); graph.Append(page, content.ToString());
     }
-    private static void InsertImage(PdfGraph graph, AddImage image)
+    private static void InsertImage(PdfGraph graph, AddImage image, CancellationToken token)
     {
         var page = graph.Page(image.PageNumber); page.Validate(image.Bounds);
-        using var data = SKData.CreateCopy(image.Image.ToArray()); using var codec = SKCodec.Create(data) ?? throw new InvalidDataException("Unsupported or invalid image.");
-        var info = codec.Info;
-        if (info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > 24L * 1024 * 1024) throw new InvalidDataException("Image exceeds the 24-megapixel decode budget.");
-        using var bitmap = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
-        if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SKCodecResult.Success) throw new InvalidDataException("Image decoding was incomplete.");
-        var raw = new byte[bitmap.ByteCount]; Marshal.Copy(bitmap.GetPixels(), raw, 0, raw.Length);
-        var rgb = new byte[info.Width * info.Height * 3]; var alpha = new byte[info.Width * info.Height]; var opaque = true;
-        for (var y = 0; y < info.Height; y++) for (var x = 0; x < info.Width; x++)
-        {
-            var source = y * bitmap.RowBytes + x * 4; var target = y * info.Width + x;
-            rgb[target * 3] = raw[source]; rgb[target * 3 + 1] = raw[source + 1]; rgb[target * 3 + 2] = raw[source + 2]; alpha[target] = raw[source + 3]; opaque &= alpha[target] == 255;
-        }
-        var dictionary = Dictionary(("Type", new PdfName("XObject")), ("Subtype", new PdfName("Image")), ("Width", new PdfNumber(info.Width)),
-            ("Height", new PdfNumber(info.Height)), ("BitsPerComponent", new PdfNumber(8L)), ("ColorSpace", new PdfName("DeviceRGB")));
-        if (!opaque)
-        {
-            var mask = dictionary.Copy(); mask["ColorSpace"] = new PdfName("DeviceGray"); dictionary["SMask"] = graph.File.Add(PdfStream.FromDecoded(alpha, mask));
-        }
-        var name = graph.Resource(page, "XObject", PdfStream.FromDecoded(rgb, dictionary)); var b = image.Bounds;
+        var name = graph.Resource(page, "XObject", CreateImageResource(graph, image.Image, false, token));
+        var b = image.Bounds;
         graph.Append(page, "q\n" + page.ViewMatrix() + $"{F(b.Width)} 0 0 {F(-b.Height)} {F(b.X)} {F(b.Bottom)} cm\n/{name} Do\nQ\n");
     }
     private static string Ellipse(double x, double y, double width, double height)

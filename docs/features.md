@@ -18,6 +18,8 @@ Implemented means executable code and regression coverage exist, not qualificati
 | Document comparison | Page-aligned visual/text difference | Compare/list/navigate/JSON report | No automatic alignment, semantic or metadata equivalence |
 | Text/image/vector insertion | Implemented | Implemented | Native insertion; no complex-script shaping |
 | Existing page content | Inspect, affine transform, duplicate, delete and clip | Object list, click/drag, corner resize and inspector commands | Whole text/path groups or XObject invocations; approximate bounds; conservative exclusions |
+| Content appearance | Native text/path colors, width/cap/join/dashes, painting modes, opacity and blend mode | Shared appearance inspector | Local graphics units; fonts/positions retained; Form/shading/marked cases excluded |
+| Image replacement and interpolation | Per-invocation resources, dimensions/metadata, static sRGB/alpha authoring with EXIF orientation | Image section and revision-aware picker | Stretches to existing geometry; 24 MP decode limit; no lossless JPEG/CMYK/ICC preservation |
 | Wrapped text and object replacement | AddTextBox and ReplaceContentText | Wrapped box tool and selected-text replacement | Overflow rejected; replaces whole text group; no adjacent-object paragraph reflow |
 | Region replacement | Implemented | Implemented | Removes all regional content; no paragraph reflow |
 | Notes/free-text/highlight/underline/strikeout | Implemented | First three tools | Underline/strikeout API-only |
@@ -46,7 +48,7 @@ The CI matrix builds all projects, tests independently reopened PDFs, raster pix
 
 Add licensed representative files covering embedded/Type3/CID fonts, CMaps, bidirectional scripts, masks, transparency, codecs, damaged cross-reference streams, tags, optional content, signatures and incremental histories. Compare in independent viewers and qualify accessibility/performance on physical machines. Each new feature must state its interoperability and security boundaries.
 
-[Existing content and wrapped text](content-editing.md) · [Output and comparison](output-comparison.md) · [Navigation and bookmarks](navigation.md)
+[Appearance and images](content-appearance.md) · [Existing content and wrapped text](content-editing.md) · [Output and comparison](output-comparison.md) · [Navigation and bookmarks](navigation.md)
 
 ## Owned backend qualifications
 

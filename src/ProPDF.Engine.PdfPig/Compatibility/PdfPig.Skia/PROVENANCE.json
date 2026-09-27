@@ -1,0 +1,174 @@
+{
+  "repository": "https://github.com/BobLd/PdfPig.Rendering.Skia",
+  "commit": "e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11",
+  "package_version": "0.1.16.4",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "Helpers/ParametricShadingTexture.cs",
+      "upstream_sha256": "5fe4fe79b9476ee8573d9c1a61a326d185dfd1f14a0691337f1a456308aaabb4",
+      "vendored_sha256": "aa8bc9db6bf6b180513638bf621d1ba5a964bc54299fa63b034ba67c2c715518"
+    },
+    {
+      "path": "Helpers/SKPaintCache.cs",
+      "upstream_sha256": "f26a6439aa44a129dd91a410d78b4a2d08456be7624da0d07e457c336fb99f23",
+      "vendored_sha256": "f1d87427fe4f7829b85eab8119cb5afbe1781483974fe5158170b04ad4546cea"
+    },
+    {
+      "path": "Helpers/SkiaExtensions.cs",
+      "upstream_sha256": "14f15da9b025b3461d9bdc9a38f249413ae976d83e9baae699758a80c7426b04",
+      "vendored_sha256": "c15a26c18d77e89e964d0395ef85f2602975e084d43c8a3504507510473dc33c"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Font.cs",
+      "upstream_sha256": "2f700b9df94f71ef4449e5d1e0210579ef320a4d8e9ceaabd07f62d8cb866de3",
+      "vendored_sha256": "07b6889baaa04012cc69fea04c52a7ae294181bea7b145ff14d251ecd9b8bc7d"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Glyph.cs",
+      "upstream_sha256": "e279fdf4b0b980a5efb2347192b456bcd15a7d375f8a5ea09aaf2211c1ca4542",
+      "vendored_sha256": "7bcf416fe722eb57dead228d1406cb425ddda44548855bc351d7839c0e37e9c6"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Type3.cs",
+      "upstream_sha256": "7621a526ff4805c6adc30f7c821a27fc8f7fc15c7f1e6c7798e5cf22070c3109",
+      "vendored_sha256": "94e420eca72527a87e4461faa1604113764d5c73b5fc37850435786cd7025737"
+    },
+    {
+      "path": "Helpers/SkiaFontCacheItem.cs",
+      "upstream_sha256": "ff180f189cbfa4f6bd3dc6c5f0bc84e2798656e1ed2c01a0c0fa8803d4c64b71",
+      "vendored_sha256": "de4951e3060e771a27de6808aa3976d2ec08f20060279fa9f8b5ad3d5d12f248"
+    },
+    {
+      "path": "Helpers/SkiaImageExtensions.cs",
+      "upstream_sha256": "cd46fe63f18adba57967cb35b0bc264f3d428e5fba6d61d17254e7e7c5740c29",
+      "vendored_sha256": "4afcffeaa3b07c59faca1cb8d8c33b44379192e90984eea39f760313e64f1f87"
+    },
+    {
+      "path": "Helpers/Type3CachedGlyph.cs",
+      "upstream_sha256": "6f7add650059d469648b7b373b7422d07cf035d7d35ed61bfb7c9656c9840be0",
+      "vendored_sha256": "14316eca7966da5d6724b692b6715de3794d565748fa2469db60c4d85ffa1ba8"
+    },
+    {
+      "path": "PageSizeFactory.cs",
+      "upstream_sha256": "a38784b827cb42d113ba45c4fb2ff1c93e11ac47eeb09d571be70ed02ffac95d",
+      "vendored_sha256": "37905be0033c2a59f8da7d233ad707ae838c098066fde5e8816d11840b5f19d3"
+    },
+    {
+      "path": "PatternAwareColorSpaceContext.cs",
+      "upstream_sha256": "2a596d2c8018a23f9162710a0461d74468318e808f216f932eeba9b7b51996f6",
+      "vendored_sha256": "818ac310ccbfd074626d92b6513cdcc92202fe5ade773b87669695d3f9b3e232"
+    },
+    {
+      "path": "PdfPageSize.cs",
+      "upstream_sha256": "aa3e6cd6c946cdeaf610c0f2909318b9f8326173653bcc967e2a97e04a45eb71",
+      "vendored_sha256": "f4a3c2ea615904e1b178b8a63adfe424ebc6a57bb5f2bb317b925bd528f61067"
+    },
+    {
+      "path": "PdfPigExtensions.cs",
+      "upstream_sha256": "d2c5460e958ae26577f978431b1967cea260d4228bedae5d5222b78a7f4a48e8",
+      "vendored_sha256": "557f904ccaf3e6ba2c288c453b2d89034bbe092930469f85555cc3cf1a41cbbb"
+    },
+    {
+      "path": "SkiaPageFactory.cs",
+      "upstream_sha256": "4b7283de54c2b8e92d7badf1138df26b86880228a02feba801224da55a937f9e",
+      "vendored_sha256": "31cdc0d4d89836f3032980d0c3943546bf37ea5b795607d64dc90e847cd801c1"
+    },
+    {
+      "path": "SkiaRenderingFilterProvider.cs",
+      "upstream_sha256": "2c2ef236fea6d4ae287e60b0d6f4f5e8e42a568c213d3cde4a06fb65fcbcbaad",
+      "vendored_sha256": "790d144ac1199e5bbb088b43a8e2a446130cdb62a264faca0e9596cb38fbcc38"
+    },
+    {
+      "path": "SkiaRenderingParsingOptions.cs",
+      "upstream_sha256": "1c2b69939f2e657668cd1bc9f34961a8c81e2bed11e31239c4e8f4530a81c18a",
+      "vendored_sha256": "c327e37477227f57f06bc0dec9b0ebfaaee281b27af9b596a174cdd2917e1e0f"
+    },
+    {
+      "path": "SkiaStreamProcessor.Annotations.Text.cs",
+      "upstream_sha256": "bd9ec2602d9dc306046a12087ed4636615b0c36b55fcad8d08c75561fe87cd50",
+      "vendored_sha256": "ff58b1a8849f51d256a5f84400c184c23ee90cd589f2b6482b12758ad5eb1c87"
+    },
+    {
+      "path": "SkiaStreamProcessor.Annotations.cs",
+      "upstream_sha256": "10d75f279a156d9b710f04ad81af2c7513577da3c1f6c312c21332d7a45722f1",
+      "vendored_sha256": "637f1171900c1e09e59bb50a362fe2f83998918c78d8487ebcf5f9e7f877ef8d"
+    },
+    {
+      "path": "SkiaStreamProcessor.Glyph.cs",
+      "upstream_sha256": "de5a9d72718fc8fc3b1b24adf3620519ac1b29d26aafe1012f7ac96a3b21a723",
+      "vendored_sha256": "3781a895406a81959b3c201ad64b8b4de2c9a699559ee555f5937ba8f30dbd12"
+    },
+    {
+      "path": "SkiaStreamProcessor.Image.cs",
+      "upstream_sha256": "e2b15091aaec2d4df4532847953c646b5d0f0e468767607dd21fdec1ef2378b9",
+      "vendored_sha256": "809869022100c7e71c71091170a2a058a1aa918f57ed7dbf52c38cca02a46438"
+    },
+    {
+      "path": "SkiaStreamProcessor.Path.cs",
+      "upstream_sha256": "d5f3212a0626cbecbf43b239fe3c4145e6fe7d50409d395e486354690c3c94d5",
+      "vendored_sha256": "78797300a0f542837ffd1dcebd6e302165ead8b8c633881961641b2bf8006938"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Axial.cs",
+      "upstream_sha256": "24577fb8ff82fc6d94458b7e74bad4125606ab0af9a97b7ba1dfdf42827ab1a4",
+      "vendored_sha256": "0b1b351099e59a682771d39711897b73aa1e4bf159593a1bb4092bc524666b6e"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Coons.cs",
+      "upstream_sha256": "e02423371e102de099ed7d8240d37cb56c30058bf5151d46cc0809fcbd6e4a54",
+      "vendored_sha256": "7108798eb6785a42316ee12c7b40ebd80b9fa8519a452aa041aacbbe06ccd1ab"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Function.cs",
+      "upstream_sha256": "81e343bd04046d9583442c8d05ddc258d3c529aa85d76803d197d6174d9ecb7f",
+      "vendored_sha256": "d53ed41c09781b87e3ee961dc840089decb96975d544fb30aa4f4b1e5c1c763d"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.GouraudFree.cs",
+      "upstream_sha256": "09187c2cd18f8186abfff90ff9c676f812b059cc6f46787815e1c7289494f867",
+      "vendored_sha256": "b4a6c46ef7d2841762f0f30e2bf6fbacb5714d91367eae91004441c1210fdff9"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.GouraudLattice.cs",
+      "upstream_sha256": "087d1539b7fd52d00e9765157d45f0caa1f1a97875aad0423812254480360ca5",
+      "vendored_sha256": "180d466f057c19605bd82b7aaa8d76ac382d476ad0a9038edda803ca2c74c663"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Radial.cs",
+      "upstream_sha256": "f28532dee3ce3c36a73571e51b472aeddfaba33aac9f478dc13612e291dd6a90",
+      "vendored_sha256": "4292cae719b8cf96d9a59db8df7b48173a3a02b70cbcd23f32165e60ed2a22cc"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Tensor.cs",
+      "upstream_sha256": "d47269c6f13efe9f9df920e94f72d021e524060636b80c2d508465e170b26eb2",
+      "vendored_sha256": "efe0daf97523518beb9a35a77f3bcad957a939679f5961268e71b54776086286"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.cs",
+      "upstream_sha256": "ddb2ce8e1b620dba6299567a50fce459bd5b1cd4a43e42f6a425c5c95545d69a",
+      "vendored_sha256": "92e207328a8d7a162ee803b86750187dc1b8de98d05f002392cc39b29b200f30"
+    },
+    {
+      "path": "SkiaStreamProcessor.SoftMask.cs",
+      "upstream_sha256": "36b6b301a8b36c363f6a57bd6b359c408ce203b36df78aa4dc8b5884866ec403",
+      "vendored_sha256": "ba9501bdd87dd0756ccdee9434fc40c6054e296128831ea98ae212535be1c23b"
+    },
+    {
+      "path": "SkiaStreamProcessor.cs",
+      "upstream_sha256": "436ee526c832f98475dbc31b868f199f2b324c9b599f1d7b383017b0c8225e5f",
+      "vendored_sha256": "c104418f117348aff09cd6496fe860c97f304b6a50c563e8023a1333b2423831"
+    },
+    {
+      "path": "LICENSE.txt",
+      "upstream_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "vendored_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE.txt",
+      "upstream_sha256": "40741b4ab76d77ba4fbc5e8759277169fb0ce281859d273075de6fd3a3588458",
+      "vendored_sha256": "40741b4ab76d77ba4fbc5e8759277169fb0ce281859d273075de6fd3a3588458"
+    }
+  ],
+  "hash_normalization": "UTF-8 text with LF line endings for vendored files; upstream hashes cover original bytes."
+}

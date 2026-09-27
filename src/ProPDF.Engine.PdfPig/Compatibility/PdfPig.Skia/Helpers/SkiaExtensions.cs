@@ -1,0 +1,482 @@
+// Modified by ProPDF: isolated compatibility namespace; see PROVENANCE.json and PATCHES.md.
+// Copyright 2024 BobLd
+//
+// Licensed under the Apache License, Version 2.0 (the "License").
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System;
+using System.Runtime.CompilerServices;
+using SkiaSharp;
+using SkiaSharp.HarfBuzz;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Graphics.Colors;
+using UglyToad.PdfPig.Graphics.Core;
+using UglyToad.PdfPig.PdfFonts;
+
+namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
+{
+    internal static class SkiaExtensions
+    {
+        private const float OneOver72 = (float)(1.0 / 72.0);
+
+        private static readonly string DefaultFamilyName = SKTypeface.Default.FamilyName;
+
+        /// <summary>
+        /// Draw a shaped glyph run for the fallback (non-vector) text path. Horizontal text uses the
+        /// default shaper; vertical text is shaped top-to-bottom (see <see cref="ShapeVertical"/>) so
+        /// HarfBuzz substitutes the vertical presentation forms.
+        /// </summary>
+        public static void DrawShapedText(this SKCanvas canvas, SKShaper shaper, string text, SKFont skFont, SKPaint paint, bool vertical)
+        {
+            if (!vertical)
+            {
+                canvas.DrawShapedText(shaper, text, SKPoint.Empty, SKTextAlign.Left, skFont, paint);
+                return;
+            }
+
+            // See https://github.com/mono/SkiaSharp/issues/4273
+            var shaped = shaper.ShapeVertical(text, skFont);
+
+            using var builder = new SKTextBlobBuilder();
+            var run = builder.AllocateRawPositionedRun(skFont, shaped.Codepoints.Length);
+            var glyphs = run.Glyphs;
+            var positions = run.Positions;
+            for (int i = 0; i < shaped.Codepoints.Length; ++i)
+            {
+                glyphs[i] = (ushort)shaped.Codepoints[i];
+                positions[i] = shaped.Points[i];
+            }
+
+            using var blob = builder.Build();
+            if (blob is not null)
+            {
+                canvas.DrawText(blob, 0, 0, paint);
+            }
+            else
+            {
+                // Fallback to default
+                canvas.DrawShapedText(shaper, text, SKPoint.Empty, SKTextAlign.Left, skFont, paint);
+            }
+        }
+
+        /// <summary>
+        /// Shape <paramref name="text"/> for vertical writing mode, returning the vertical
+        /// presentation-form glyphs positioned with the horizontal layout.
+        /// <para>
+        /// Setting the buffer direction top-to-bottom makes HarfBuzz apply its default 'vert' feature,
+        /// substituting the vertical presentation forms (rotated brackets, repositioned punctuation, the
+        /// prolonged-sound mark, ...). We take only the substituted glyph ids from that pass and keep the
+        /// <em>horizontal</em> glyph positions: PdfPig already places the pen for vertical writing using
+        /// the font's position vector (W2/DW2), so HarfBuzz's vertical positions — which add the fallback
+        /// font's own vertical-origin offset on top — would shift every glyph off its bounding box. For
+        /// the single glyph PdfPig renders per character code the horizontal position is simply the origin.
+        /// </para>
+        /// </summary>
+        public static SKShaper.Result ShapeVertical(this SKShaper shaper, string text, SKFont skFont)
+        {
+            // See https://github.com/mono/SkiaSharp/issues/4273
+            using var buffer = new HarfBuzzSharp.Buffer();
+            buffer.AddUtf16(text);
+            buffer.GuessSegmentProperties();
+            buffer.Direction = HarfBuzzSharp.Direction.TopToBottom;
+            SKShaper.Result vertical = shaper.Shape(buffer, skFont);
+
+            SKShaper.Result horizontal = shaper.Shape(text, skFont);
+
+            // 'vert' is a one-to-one (GSUB single) substitution, so the horizontal and vertical passes
+            // produce the same glyph count in the same order. When that holds, draw the vertical glyphs
+            // at the horizontal positions; otherwise fall back to the vertical result unchanged.
+            if (horizontal.Codepoints.Length == vertical.Codepoints.Length)
+            {
+                return new SKShaper.Result(vertical.Codepoints, vertical.Clusters, horizontal.Points, horizontal.Width);
+            }
+
+            return vertical;
+        }
+
+        public static bool IsDefault(this SKTypeface typeface)
+        {
+            return typeface.FamilyName.Equals(DefaultFamilyName);
+        }
+
+        public static SKFontStyle GetFontStyle(this FontDetails fontDetails)
+        {
+            if (fontDetails.IsBold && fontDetails.IsItalic)
+            {
+                return SKFontStyle.BoldItalic;
+            }
+
+            if (fontDetails.IsBold)
+            {
+                return SKFontStyle.Bold;
+            }
+
+            return fontDetails.IsItalic ? SKFontStyle.Italic : SKFontStyle.Normal;
+        }
+
+        public static string? GetCleanFontName(this IFont font)
+        {
+            string? fontName = font.Name?.Data;
+            if (fontName is null)
+            {
+                return null;
+            }
+
+            if (fontName.Length <= 7 || !fontName[6].Equals('+'))
+            {
+                return fontName;
+            }
+
+            for (int c = 0; c < 6; ++c)
+            {
+                if (!char.IsUpper(fontName[c]))
+                {
+                    return fontName;
+                }
+            }
+
+            return fontName.Substring(7);
+        }
+
+        public static SKRect ToSKRect(this PdfRectangle rect)
+        {
+            float left = (float)rect.Left;
+            float bottom = (float)rect.BottomLeft.Y;
+            float right = left + (float)rect.Width;
+            float top = bottom + (float)rect.Height;
+            return new SKRect(left, top, right, bottom);
+        }
+
+        public static SKRectI ToSKRectI(this PdfRectangle rect)
+        {
+            double left = rect.Left;
+            double top = rect.Top;
+            double right = left + rect.Width;
+            double bottom = top + rect.Height;
+            return new SKRectI((int)left, (int)top, (int)right, (int)bottom); // TODO - rounding
+        }
+
+        public static SKPoint ToSKPoint(this PdfPoint pdfPoint)
+        {
+            return new SKPoint((float)pdfPoint.X, (float)pdfPoint.Y);
+        }
+
+        public static SKStrokeJoin ToSKStrokeJoin(this LineJoinStyle lineJoinStyle)
+        {
+            return lineJoinStyle switch
+            {
+                LineJoinStyle.Bevel => SKStrokeJoin.Bevel,
+                LineJoinStyle.Miter => SKStrokeJoin.Miter,
+                LineJoinStyle.Round => SKStrokeJoin.Round,
+                _ => throw new NotImplementedException($"Unknown LineJoinStyle '{lineJoinStyle}'.")
+            };
+        }
+
+        public static SKStrokeCap ToSKStrokeCap(this LineCapStyle lineCapStyle)
+        {
+            return lineCapStyle switch
+            {
+                LineCapStyle.Butt => SKStrokeCap.Butt,
+                LineCapStyle.ProjectingSquare => SKStrokeCap.Square,
+                LineCapStyle.Round => SKStrokeCap.Round,
+                _ => throw new NotImplementedException($"Unknown LineCapStyle '{lineCapStyle}'.")
+            };
+        }
+
+        public static SKPathEffect? ToSKPathEffect(this LineDashPattern lineDashPattern)
+        {
+            if (lineDashPattern.Phase == 0 && !(lineDashPattern.Array?.Count > 0))
+            {
+                return null;
+            }
+
+            int size = lineDashPattern.Array.Count;
+            switch (size)
+            {
+                case 1:
+                    {
+                        var v = (float)lineDashPattern.Array[0];
+                        if (Math.Abs(v) < float.Epsilon)
+                        {
+                            v = OneOver72; // TODO - Add tests
+                        }
+                        return SKPathEffect.CreateDash([v, v], lineDashPattern.Phase);
+                    }
+                case > 0:
+                    {
+                        // Skia: The intervals must have an even number of entries.
+                        // See 'PostScript Language Reference - third edition.pdf'
+                        // p175 for odd number of entries
+                        if (size % 2 != 0)
+                        {
+                            size--; // Ignore last entry
+                        }
+
+                        float[] pattern = new float[size];
+                        for (int i = 0; i < size; ++i)
+                        {
+                            var v = (float)lineDashPattern.Array[i];
+                            if (Math.Abs(v) < float.Epsilon)
+                            {
+                                pattern[i] = OneOver72; // See APISmap1.pdf
+                            }
+                            else
+                            {
+                                pattern[i] = v;
+                            }
+                        }
+
+                        return SKPathEffect.CreateDash(pattern, lineDashPattern.Phase);
+                    }
+                default:
+                    return SKPathEffect.CreateDash([0, 0], lineDashPattern.Phase);
+            }
+        }
+
+        public static SKPaintStyle? ToSKPaintStyle(this TextRenderingMode textRenderingMode)
+        {
+            // TODO - to finish, not correct
+            switch (textRenderingMode)
+            {
+                case TextRenderingMode.Stroke:
+                case TextRenderingMode.StrokeClip:
+                    return SKPaintStyle.Stroke;
+
+                case TextRenderingMode.Fill:
+                case TextRenderingMode.FillClip:
+                    return SKPaintStyle.Fill;
+
+                case TextRenderingMode.FillThenStroke:
+                case TextRenderingMode.FillThenStrokeClip:
+                    return SKPaintStyle.StrokeAndFill;
+
+                case TextRenderingMode.NeitherClip:
+                case TextRenderingMode.Neither:
+                default:
+                    return null;
+            }
+        }
+
+        public static SKPathFillType ToSKPathFillType(this FillingRule fillingRule)
+        {
+            return fillingRule == FillingRule.NonZeroWinding ? SKPathFillType.Winding : SKPathFillType.EvenOdd;
+        }
+
+        /// <summary>
+        /// Converts colour-space components into an <see cref="SKColor"/>, bypassing the per-call <see cref="IColor"/> allocation.
+        /// <para>
+        /// Fast paths (allocation-free): DeviceRgb, DeviceGray and DeviceCmyk.
+        /// </para>
+        /// Anything else through <see cref="ColorSpaceDetails.GetColor"/> + <c>Helpers.SkiaExtensions.ToSKColor</c>
+        /// path so colour spaces whose <c>GetColor</c> returns a <see cref="CMYKColor"/> still hit
+        /// the same RGB approximation.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static SKColor GetSKColor(this ColorSpaceDetails colorSpace, ReadOnlySpan<double> components, double alpha)
+        {
+            byte a = (alpha * 255.0).ToByte();
+            if (colorSpace is DeviceCmykColorSpaceDetails && components.Length >= 4)
+            {
+                ApproximateCmykToRgb(
+                    (components[0] * 255.0).ToByte(),
+                    (components[1] * 255.0).ToByte(),
+                    (components[2] * 255.0).ToByte(),
+                    (components[3] * 255.0).ToByte(),
+                    out byte r, out byte g, out byte b);
+                return new SKColor(r, g, b, a);
+            }
+
+            if (colorSpace is DeviceRgbColorSpaceDetails || colorSpace is DeviceGrayColorSpaceDetails)
+            {
+                colorSpace.GetRgb(components, out double rd, out double gd, out double bd);
+                return new SKColor(
+                    (rd * 255.0).ToByte(),
+                    (gd * 255.0).ToByte(),
+                    (bd * 255.0).ToByte(),
+                    a);
+            }
+
+            // Complex / wrapped colour spaces — defer to IColor so the renderer keeps its
+            // CMYK approximation when the underlying space resolves to CMYKColor.
+            return colorSpace.GetColor(components).ToSKColor(alpha);
+        }
+
+        public static SKColor ToSKColor(this IColor? pdfColor, double alpha = 1)
+        {
+            if (pdfColor is not null)
+            {
+                if (pdfColor is CMYKColor cmyk)
+                {
+                    return cmyk.ToSKColor(alpha);
+                }
+
+                var (r, g, b) = pdfColor.ToRGBValues();
+
+                if (r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1)
+                {
+                    // This is the expected case
+                    return new SKColor(
+                        (r * 255).ToByte(),
+                        (g * 255).ToByte(),
+                        (b * 255).ToByte(),
+                        (alpha * 255).ToByte());
+                }
+
+                // Should never happen, but see GHOSTSCRIPT-686749-1.pdf
+                return new SKColor(r.ToByte(),
+                    g.ToByte(),
+                    b.ToByte(),
+                    (alpha * 255).ToByte());
+            }
+
+            return SKColors.Black.WithAlpha((alpha * 255).ToByte());
+        }
+
+        public static SKColor ToSKColor(this CMYKColor cmyk, double alpha = 1)
+        {
+            byte c, m, y, k;
+            if (cmyk.C >= 0 && cmyk.C <= 1 && cmyk.M >= 0 && cmyk.M <= 1 &&
+                cmyk.Y >= 0 && cmyk.Y <= 1 && cmyk.K >= 0 && cmyk.K <= 1)
+            {
+                // This is the expected case
+                c = (cmyk.C * 255).ToByte();
+                m = (cmyk.M * 255).ToByte();
+                y = (cmyk.Y * 255).ToByte();
+                k = (cmyk.K * 255).ToByte();
+            }
+            else
+            {
+                // Should never happen, but happens with RGB color space in GHOSTSCRIPT-686749-1.pdf
+                c = cmyk.C.ToByte();
+                m = cmyk.M.ToByte();
+                y = cmyk.Y.ToByte();
+                k = cmyk.K.ToByte();
+            }
+
+            ApproximateCmykToRgb(c, m, y, k, out byte r, out byte g, out byte b);
+            return new SKColor(r, g, b, (alpha * 255).ToByte());
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static byte ToByte(this double v)
+        {
+            return v switch
+            {
+                >= byte.MaxValue => byte.MaxValue,
+                <= byte.MinValue => byte.MinValue,
+                _ => Convert.ToByte(v)
+            };
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void ApproximateCmykToRgb(in byte cIn, in byte mIn, in byte yIn, in byte kIn, out byte r, out byte g, out byte b)
+        {
+            // From https://graphicdesign.stackexchange.com/questions/114260/alternative-formulae-for-cmyk-to-rgb-conversion-for-display-on-screen
+
+            // inputs are c,m,y,k components on a 0-1 scale
+            // work with INVERSE of CMYK values, on a 0-255 scale
+            float c = 255 * (1 - cIn / 255f);
+            float m = 255 * (1 - mIn / 255f);
+            float y = 255 * (1 - yIn / 255f);
+            float k = 255 * (1 - kIn / 255f);
+
+            float rf = 80 + 0.5882f * c - 0.3529f * m - 0.1373f * y + 0.00185f * c * m + 0.00046f * y * c; // no YM
+            float gf = 66 - 0.1961f * c + 0.2745f * m - 0.0627f * y + 0.00215f * c * m + 0.00008f * y * c + 0.00062f * y * m;
+            float bf = 86 - 0.3255f * c - 0.1569f * m + 0.1647f * y + 0.00046f * c * m + 0.00123f * y * c + 0.00215f * y * m;
+
+            r = Clamp(rf * k / 255);
+            g = Clamp(gf * k / 255);
+            b = Clamp(bf * k / 255);
+
+            static byte Clamp(float v)
+            {
+                return v switch
+                {
+                    >= byte.MaxValue => byte.MaxValue,
+                    <= byte.MinValue => byte.MinValue,
+                    _ => Convert.ToByte(v)
+                };
+            }
+
+            // See also https://github.com/UglyToad/PdfPig/issues/1144
+        }
+
+        public static SKMatrix ToSkMatrix(this TransformationMatrix transformationMatrix)
+        {
+            return new SKMatrix((float)transformationMatrix.A, (float)transformationMatrix.C,
+                (float)transformationMatrix.E,
+                (float)transformationMatrix.B, (float)transformationMatrix.D, (float)transformationMatrix.F,
+                0, 0, 1);
+        }
+
+        public static SKBlendMode ToSKBlendMode(this BlendMode blendMode)
+        {
+
+            // https://pdfium.googlesource.com/pdfium/+/refs/heads/main/core/fxge/skia/fx_skia_device.cpp
+            switch (blendMode)
+            {
+                // 11.3.5.2 Separable blend modes
+                case BlendMode.Normal: // aka Compatible
+                    return SKBlendMode.SrcOver;
+
+                case BlendMode.Multiply:
+                    return SKBlendMode.Multiply;
+
+                case BlendMode.Screen:
+                    return SKBlendMode.Screen;
+
+                case BlendMode.Overlay:
+                    return SKBlendMode.Overlay;
+
+                case BlendMode.Darken:
+                    return SKBlendMode.Darken;
+
+                case BlendMode.Lighten:
+                    return SKBlendMode.Lighten;
+
+                case BlendMode.ColorDodge:
+                    return SKBlendMode.ColorDodge;
+
+                case BlendMode.ColorBurn:
+                    return SKBlendMode.ColorBurn;
+
+                case BlendMode.HardLight:
+                    return SKBlendMode.HardLight;
+
+                case BlendMode.SoftLight:
+                    return SKBlendMode.SoftLight;
+
+                case BlendMode.Difference:
+                    return SKBlendMode.Difference;
+
+                case BlendMode.Exclusion:
+                    return SKBlendMode.Exclusion;
+
+                // 11.3.5.3 Non-separable blend modes
+                case BlendMode.Hue:
+                    return SKBlendMode.Hue;
+
+                case BlendMode.Saturation:
+                    return SKBlendMode.Saturation;
+
+                case BlendMode.Color:
+                    return SKBlendMode.Color;
+
+                case BlendMode.Luminosity:
+                    return SKBlendMode.Luminosity;
+
+                default:
+                    throw new NotImplementedException($"Cannot convert blend mode '{blendMode}' to SKBlendMode.");
+            }
+        }
+    }
+}

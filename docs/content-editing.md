@@ -30,6 +30,10 @@ All geometry uses the shared top-left, cropped/rotated page coordinate system in
 
 `ReplaceContentText` replaces a selected text group with native wrapped text inside an explicit rectangle. Other overlapping content remains at its existing paint order. It does not remove everything in that rectangle, unlike `ReplaceRegionText`. The chosen group may contain several runs or lines; replacement applies to the whole group, not one selected substring. Original formatting is replaced by the specified font, size, alignment and color. It does not automatically reflow neighboring page objects.
 
+## Appearance and image pixels
+
+`SetContentAppearance`, `ReplaceContentImage` and `SetContentImageInterpolation` extend the same revision-bound object handles. Native colors, opacity, line painting and one-invocation image replacement are exposed in the shared inspector. See [Appearance and images](content-appearance.md) for alpha semantics, EXIF orientation, resource isolation and rendering corrections.
+
 ## Wrapped text boxes
 
 `AddTextBox` authors new text with left, center or right alignment, explicit font size and line spacing. Widths come from the selected font's metrics. A long word is split at Unicode text-element boundaries, avoiding broken surrogate pairs. Newlines are normalized and whitespace at wrap boundaries is normalized. This is ordinary text-box layout, not byte-for-byte preservation of whitespace or a complex-script shaping engine.
