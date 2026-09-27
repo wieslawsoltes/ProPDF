@@ -27,6 +27,8 @@ if (@($versions.Values | Select-Object -Unique).Count -ne 1) { throw 'Package ve
 $version = $versions['ProPDF.Core']
 $work = Join-Path ([System.IO.Path]::GetTempPath()) "propdf-consumer-$([guid]::NewGuid().ToString('N'))"
 New-Item $work -ItemType Directory | Out-Null
+$previousNodeReuse = $env:MSBUILDDISABLENODEREUSE
+$env:MSBUILDDISABLENODEREUSE = '1'
 function Invoke-DotNet([string[]]$Arguments) {
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) { throw "dotnet $($Arguments[0]) failed: $LASTEXITCODE" }
@@ -40,7 +42,7 @@ function New-Consumer([string]$Name,[string]$Framework,[string[]]$References,[st
     $useWpf = if ($Wpf) { '<UseWPF>true</UseWPF>' } else { '' }
     @"
 <Project Sdk="Microsoft.NET.Sdk">
-<PropertyGroup><TargetFramework>$Framework</TargetFramework><OutputType>$output</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><EnableWindowsTargeting>true</EnableWindowsTargeting><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>$useWpf</PropertyGroup>
+<PropertyGroup><TargetFramework>$Framework</TargetFramework><OutputType>$output</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><EnableWindowsTargeting>true</EnableWindowsTargeting><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally><UseSharedCompilation>false</UseSharedCompilation>$useWpf</PropertyGroup>
 <ItemGroup>$refs $native</ItemGroup>
 </Project>
 "@ | Set-Content (Join-Path $directory "$Name.csproj") -Encoding utf8
@@ -79,9 +81,20 @@ Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rende
     $avalonia = New-Consumer -Name AvaloniaConsumer -Framework net8.0 -References @('ProPDF.Avalonia') -Code 'public static class Consumer { public static ProPDF.Avalonia.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     $wpf = New-Consumer -Name WpfConsumer -Framework net8.0-windows -References @('ProPDF.Wpf') -Wpf $true -Code 'public static class Consumer { public static ProPDF.Wpf.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     foreach ($project in @($engine,$avalonia,$wpf)) {
-        Invoke-DotNet -Arguments @('restore',$project,'--configfile',(Join-Path $work 'NuGet.Config'))
-        Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore')
+        Invoke-DotNet -Arguments @('restore',$project,'--disable-build-servers','--configfile',(Join-Path $work 'NuGet.Config'))
+        Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore','--disable-build-servers','-p:UseSharedCompilation=false')
     }
     Invoke-DotNet -Arguments @('run','--project',$engine,'-c','Release','--no-build')
     Write-Host "PASS: all seven standalone packages at $version."
-} finally { if (Test-Path $work) { Remove-Item $work -Recurse -Force } }
+} finally {
+    $env:MSBUILDDISABLENODEREUSE = $previousNodeReuse
+    # Antivirus or third-party build services may briefly retain the temporary directory on Windows.
+    # Cleanup must not replace an earlier validation exception or report a passing consumer as failed.
+    for ($attempt = 0; $attempt -lt 5 -and (Test-Path $work); $attempt++) {
+        try { Remove-Item $work -Recurse -Force -ErrorAction Stop }
+        catch {
+            if ($attempt -eq 4) { Write-Warning "Temporary consumer directory remains locked: $work. All validation failures remain fatal; only cleanup is best-effort." }
+            else { Start-Sleep -Milliseconds (200 * ($attempt + 1)) }
+        }
+    }
+}

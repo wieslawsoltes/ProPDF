@@ -15,6 +15,7 @@ public sealed partial class PdfEditor : UserControl
     public PdfEditor()
     {
         InitializeComponent();
+        PdfOutputToolbar.Install(this);
         Loaded += (_, _) => { if (Workspace is null && Context is not null) ResetWorkspace(); };
         Unloaded += (_, _) => { Workspace?.Dispose(); Workspace = null; DataContext = null; };
     }

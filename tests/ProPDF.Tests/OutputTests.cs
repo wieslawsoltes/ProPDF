@@ -3,8 +3,8 @@ using ProPDF.Core;
 using ProPDF.Editing.iText;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Rendering.Skia;
-using SkiaSharp;
 using Xunit;
+using SkiaSharp;
 
 namespace ProPDF.Tests;
 
@@ -59,7 +59,7 @@ public sealed class OutputTests
         var document = await editor.CreateAsync();
         await using var renderer = new SkiaPdfRenderer(backend);
         var export = new PdfRasterExporter(renderer);
-        Assert.Throws<InvalidOperationException>(() => export.RenderPageAsync(document, 1, new PdfRasterExportOptions(MaximumPixels: 100)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => export.RenderPageAsync(document, 1, new PdfRasterExportOptions(MaximumPixels: 100)));
         var path = Path.Combine(Path.GetTempPath(), $"propdf-export-{Guid.NewGuid():N}.png");
         try
         {
@@ -103,8 +103,7 @@ public sealed class OutputTests
         { new AddShape(1, new PdfRect(20, 30, 40, 50), Fill: new PdfColor(255, 0, 0)), new AddText(1, new PdfPoint(20, 120), "Changed"), new InsertBlankPage(2, new PdfSize(200, 300)) });
         await using var renderer = new SkiaPdfRenderer(backend);
         var compare = new PdfDocumentComparer(renderer, backend);
-        var identical = await compare.CompareAsync(original, original);
-        Assert.True(identical.AreEqual);
+        Assert.True((await compare.CompareAsync(original, original)).AreEqual);
         var result = await compare.CompareAsync(original, modified);
         Assert.False(result.AreEqual);
         Assert.Equal(2, result.ChangedPageCount);
@@ -113,8 +112,7 @@ public sealed class OutputTests
         Assert.True(result.Pages[0].TextChanged);
         Assert.NotNull(result.Pages[0].ChangedBounds);
         Assert.Equal(PdfPageChangeKind.Added, result.Pages[1].Kind);
-        var reverse = await compare.CompareAsync(modified, original);
-        Assert.Equal(PdfPageChangeKind.Removed, reverse.Pages[1].Kind);
+        Assert.Equal(PdfPageChangeKind.Removed, (await compare.CompareAsync(modified, original)).Pages[1].Kind);
     }
 
     [Fact]

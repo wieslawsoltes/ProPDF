@@ -15,7 +15,11 @@ public sealed partial class PdfEditor : UserControl
     public static readonly StyledProperty<PdfEditorContext?> ContextProperty = AvaloniaProperty.Register<PdfEditor, PdfEditorContext?>(nameof(Context));
     public PdfEditorContext? Context { get => GetValue(ContextProperty); set => SetValue(ContextProperty, value); }
     public PdfWorkspace? Workspace { get; private set; }
-    public PdfEditor() => AvaloniaXamlLoader.Load(this);
+    public PdfEditor()
+    {
+        AvaloniaXamlLoader.Load(this);
+        PdfOutputToolbar.Install(this);
+    }
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
