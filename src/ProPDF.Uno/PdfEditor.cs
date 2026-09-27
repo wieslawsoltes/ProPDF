@@ -12,7 +12,7 @@ public sealed class PdfEditor : UserControl, IDisposable
     public PdfWorkspace? Workspace { get; private set; }
     public PdfView View { get; } = new();
     private readonly Grid _body = new();
-    private readonly ListView _pages = new() { SelectionMode = ListViewSelectionMode.Single, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+    private readonly ListView _pages = new() { Name = "PagesList", SelectionMode = ListViewSelectionMode.Single, HorizontalContentAlignment = HorizontalAlignment.Stretch };
     private readonly PdfInspectorPanels _inspector = new();
     private PdfUnoFiles? _defaultFiles;
     private Guid? _pagesRevision;
@@ -98,7 +98,15 @@ public sealed class PdfEditor : UserControl, IDisposable
         _syncing = true;
         try
         {
-            if (_pagesRevision != w.Document?.Id) { _pagesRevision = w.Document?.Id; _pages.ItemsSource = w.Pages.Select(page => new PdfUnoPage(w.Viewport, page.Number)).ToArray(); }
+            var document = w.Document;
+            if (_pagesRevision != document?.Id)
+            {
+                // Session.Current can advance before the queued workspace refresh
+                // publishes Pages. Capture both identity and pages from one snapshot;
+                // otherwise an early notification can cache an empty list forever.
+                _pages.ItemsSource = document?.Pages.Select(page => new PdfUnoPage(w.Viewport, page.Number)).ToArray();
+                _pagesRevision = document?.Id;
+            }
             _pages.SelectedIndex = w.Viewport.CurrentPage - 1;
         }
         finally { _syncing = false; }

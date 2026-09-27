@@ -48,6 +48,8 @@ jobs:
         run: |
           npm install --ignore-scripts
           npx playwright install --with-deps chromium
+      - name: Deployment verifier regression tests
+        run: node --test scripts/browser/deployment.test.mjs
       - name: Actual browser workflow validation
         shell: bash
         run: |
@@ -78,6 +80,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: browser
     runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write
@@ -93,3 +97,31 @@ jobs:
           enablement: true
       - id: deployment
         uses: actions/deploy-pages@v4
+  verify-deployment:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Install the browser test runner
+        working-directory: scripts/browser
+        run: |
+          npm install --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Verify exact deployed commit and run public-site editing workflows
+        env:
+          PROPDF_URL: ${{ needs.deploy.outputs.page_url }}
+          PROPDF_EXPECT_COMMIT: ${{ github.sha }}
+          PROPDF_QA: artifacts/browser-live
+        run: node scripts/browser/verify-deployment.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: uno-live-site-validation
+          path: artifacts/browser-live/
+          if-no-files-found: warn

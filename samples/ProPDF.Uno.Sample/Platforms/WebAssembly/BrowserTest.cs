@@ -29,6 +29,8 @@ public static partial class BrowserTest
         using var scene = c.CaptureScene();
         writer.WriteStartObject();
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
+        writer.WriteNumber("pageWidth", w.Document?.GetPage(c.CurrentPage).Size.Width ?? 0);
+        writer.WriteNumber("pageItems", ((ListView)Find("PagesList")).Items.Count);
         writer.WriteNumber("page", c.CurrentPage); writer.WriteNumber("zoom", c.Zoom);
         writer.WriteBoolean("dirty", w.Session.IsDirty); writer.WriteBoolean("canUndo", w.Session.CanUndo);
         writer.WriteBoolean("canRedo", w.Session.CanRedo); writer.WriteBoolean("busy", w.IsBusy);
@@ -53,6 +55,20 @@ public static partial class BrowserTest
         writer.WriteEndArray();
     });
     [JSExport]
+    public static string Thumbnails() => Json(writer =>
+    {
+        writer.WriteStartArray();
+        foreach (var thumbnail in Elements().OfType<PdfThumbnail>().Where(e => e.IsLoaded && e.ActualHeight > 0))
+        {
+            var p = thumbnail.TransformToVisual(_editor).TransformPoint(new Windows.Foundation.Point(0, 0));
+            writer.WriteStartObject(); writer.WriteNumber("page", thumbnail.PageNumber);
+            writer.WriteNumber("x", p.X); writer.WriteNumber("y", p.Y);
+            writer.WriteNumber("width", thumbnail.ActualWidth); writer.WriteNumber("height", thumbnail.ActualHeight);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    });
+    [JSExport]
     public static async Task Click(string name)
     {
         if (Find(name) is not Button b || b.Command is not PdfUiCommand command || !command.CanExecute(null)) throw new InvalidOperationException("Bound command unavailable: " + name);
@@ -72,9 +88,26 @@ public static partial class BrowserTest
         if (Find(name) is not ComboBox box) throw new ArgumentException("Choice not found: " + name); box.SelectedIndex = index;
     }
     [JSExport]
+    public static void Expand(string name, bool expanded)
+    { if (Find(name) is not Expander section) throw new ArgumentException("Section not found: " + name); section.IsExpanded = expanded; }
+    // Loading PDF content completes before queued native binding updates. Tests
+    // must await the real list rather than assigning ItemsSource or sleeping.
+    [JSExport]
+    public static bool ContentListReady()
+    {
+        var list = (ListView)Find("ContentObjectsList");
+        var objects = Workspace.ContentObjects;
+        if (!ReferenceEquals(list.ItemsSource, objects) || list.Items.Count != objects.Count) return false;
+        for (var i = 0; i < objects.Count; i++)
+            if (!ReferenceEquals(list.Items[i], objects[i])) return false;
+        return true;
+    }
+    [JSExport]
     public static void SelectObject(int index, bool extend)
     {
         var list = (ListView)Find("ContentObjectsList");
+        if (!ContentListReady()) throw new InvalidOperationException("Wait for the native content list to bind the current inspection.");
+        if ((uint)index >= (uint)list.Items.Count) throw new ArgumentOutOfRangeException(nameof(index));
         if (!extend) list.SelectedItems.Clear(); list.SelectedItems.Add(list.Items[index]);
     }
     [JSExport]

@@ -57,3 +57,7 @@ The PDF object model, parser, stream filters, writer, native edits and Standard 
 Multi-object selection now supports atomic same-page move/resize/rotate/flip/duplicate/delete, alignment and center/gap distribution in both native editors. The 1,000-object limit, whole-invocation semantics and logical-bound restrictions are described in [Content editing](content-editing.md#multi-object-selection-and-atomic-editing).
 
 Uno browser/desktop integration and its platform-specific limits are documented in [Uno Platform](uno-platform.md).
+
+## Rendering responsiveness and target alignment
+
+Warm immutable tiles can be leased independently of an occupied PDF interpreter worker. Viewports reuse identical tile plans during scrolling, retain matching tiles during progressive publication, and coalesce queued notifications. Page/region-relative alignment translates a selection as one unit and supports a single object; selection-relative member alignment and distribution remain available. See [rendering performance](performance.md) and [content editing](content-editing.md). These improvements do not change the unimplemented compatibility areas above.

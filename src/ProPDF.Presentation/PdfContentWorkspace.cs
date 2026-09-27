@@ -3,6 +3,9 @@ using ProPDF.Core;
 
 namespace ProPDF.Presentation;
 
+/// <summary>Reference for content alignment. Page and Region translate the selection as one unit.</summary>
+public enum PdfContentAlignmentReference { Selection, Page, Region }
+
 public sealed partial class PdfWorkspace
 {
     private IReadOnlyList<PdfContentObject>? _contentEditorSelection;
@@ -10,6 +13,7 @@ public sealed partial class PdfWorkspace
     private PdfUiCommand? _editObjects, _refreshObjects, _applyBounds, _deleteObject, _duplicateObject, _rotateObject, _flipObject, _replaceObjectText, _clipObject;
     private PdfUiCommand? _selectAllObjects, _selectRegionObjects, _clearObjects, _alignObjects, _distributeObjects;
     private PdfSelectionAlignment _contentAlignment;
+    private PdfContentAlignmentReference _contentAlignmentReference;
     private PdfSelectionDistribution _contentDistribution;
     public IReadOnlyList<PdfContentObject> ContentObjects => Viewport.ContentObjects;
     public IReadOnlyList<PdfContentObject> SelectedContentObjects => Viewport.SelectedContentObjects;
@@ -44,6 +48,12 @@ public sealed partial class PdfWorkspace
     }
     public PdfTextAlignment[] TextAlignments { get; } = Enum.GetValues<PdfTextAlignment>();
     public PdfTextAlignment TextAlignment { get => Viewport.TextBoxAlignment; set { Viewport.TextBoxAlignment = value; Changed(); } }
+    public IReadOnlyList<PdfContentAlignmentReference> ContentAlignmentReferences { get; } = Array.AsReadOnly(Enum.GetValues<PdfContentAlignmentReference>());
+    public PdfContentAlignmentReference ContentAlignmentReference
+    {
+        get => _contentAlignmentReference;
+        set { if (Enum.IsDefined(value) && Set(ref _contentAlignmentReference, value)) RefreshCommands(); }
+    }
     public IReadOnlyList<PdfSelectionAlignment> ContentAlignments { get; } = Array.AsReadOnly(Enum.GetValues<PdfSelectionAlignment>());
     public IReadOnlyList<PdfSelectionDistribution> ContentDistributions { get; } = Array.AsReadOnly(Enum.GetValues<PdfSelectionDistribution>());
     public PdfSelectionAlignment ContentAlignment { get => _contentAlignment; set { if (Enum.IsDefined(value)) Set(ref _contentAlignment, value); } }
@@ -101,8 +111,36 @@ public sealed partial class PdfWorkspace
     public PdfUiCommand AlignObjectsCommand => _alignObjects ??= Command(token =>
     {
         var items = SelectedContentObjects;
-        return Session.ApplyAsync(PdfContentSelection.Align(items, ContentAlignment), items[0].Reference.Revision, token);
-    }, () => CanEditContentSelection() && SelectedContentObjects.Count >= 2);
+        var edit = ContentAlignmentReference switch
+        {
+            PdfContentAlignmentReference.Page => PdfContentSelection.AlignToBounds(items, PageAlignmentBounds(items[0].Reference.PageNumber), ContentAlignment),
+            PdfContentAlignmentReference.Region => PdfContentSelection.AlignToBounds(items, RegionAlignmentBounds(items), ContentAlignment),
+            _ => PdfContentSelection.Align(items, ContentAlignment)
+        };
+        return Session.ApplyAsync(edit, items[0].Reference.Revision, token);
+    }, () => CanEditContentSelection() && (ContentAlignmentReference switch
+    {
+        PdfContentAlignmentReference.Selection => SelectedContentObjects.Count >= 2,
+        PdfContentAlignmentReference.Page => true,
+        PdfContentAlignmentReference.Region => HasContentAlignmentRegion(),
+        _ => false
+    }));
+    private PdfRect PageAlignmentBounds(int pageNumber)
+    {
+        var size = Document!.GetPage(pageNumber).Size;
+        return new(0, 0, size.Width, size.Height);
+    }
+    private bool HasContentAlignmentRegion() => SelectedContentObjects.Count != 0 &&
+        Viewport.Selection is { Bounds.IsEmpty: false } region && region.Revision == Document?.Id &&
+        region.PageNumber == SelectedContentObjects[0].Reference.PageNumber;
+    private PdfRect RegionAlignmentBounds(IReadOnlyList<PdfContentObject> items)
+    {
+        var region = Viewport.Selection ?? throw new InvalidOperationException("Select an alignment region on the objects' page first.");
+        if (region.Revision != items[0].Reference.Revision) throw new PdfRevisionConflictException();
+        if (region.Bounds.IsEmpty || region.PageNumber != items[0].Reference.PageNumber)
+            throw new InvalidOperationException("The alignment region must be on the selected objects' page.");
+        return region.Bounds;
+    }
     public PdfUiCommand DistributeObjectsCommand => _distributeObjects ??= Command(token =>
     {
         var items = SelectedContentObjects;

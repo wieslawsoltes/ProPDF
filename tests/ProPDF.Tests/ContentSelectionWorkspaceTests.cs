@@ -104,6 +104,45 @@ public sealed class ContentSelectionWorkspaceTests
         await view.WaitForRenderingAsync(); runtime.Drain(); Assert.Equal("Invalid geometry draft", view.LastError);
         view.ClearError(); Assert.Null(view.LastError);
     }
+    [Fact]
+    public async Task PageAlignmentAcceptsOneObjectAndUsesActualPageSize()
+    {
+        await using var runtime = await Runtime.CreateAsync();
+        using var workspace = new PdfWorkspace(new(runtime.View, runtime.Editor), new Dialogs(), runtime.Dispatch);
+        var before = runtime.Session.Current!; var original = workspace.ContentObjects.ToArray();
+        workspace.SelectContentObjects(original.Take(1));
+        Assert.False(workspace.AlignObjectsCommand.CanExecute(null));
+        workspace.ContentAlignmentReference = PdfContentAlignmentReference.Page;
+        workspace.ContentAlignment = PdfSelectionAlignment.Right; runtime.Drain();
+        Assert.True(workspace.AlignObjectsCommand.CanExecute(null));
+        await workspace.AlignObjectsCommand.ExecuteAsync(); runtime.Drain();
+        var actual = (await runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1)).Objects;
+        Assert.Equal(before.GetPage(1).Size.Width, actual[0].Bounds.Right, 3);
+        Assert.Equal(original[0].Bounds.Y, actual[0].Bounds.Y); Assert.Equal(original[1].Bounds, actual[1].Bounds);
+        await workspace.UndoCommand.ExecuteAsync(); Assert.Same(before, runtime.Session.Current);
+    }
+    [Fact]
+    public async Task RegionAlignmentKeepsSpacingAndDisablesAfterRegionInvalidation()
+    {
+        await using var runtime = await Runtime.CreateAsync(); var view = runtime.View;
+        using var workspace = new PdfWorkspace(new(view, runtime.Editor), new Dialogs(), runtime.Dispatch);
+        workspace.ContentAlignmentReference = PdfContentAlignmentReference.Region;
+        workspace.SelectContentObjects(workspace.ContentObjects.Take(2));
+        Assert.False(workspace.AlignObjectsCommand.CanExecute(null));
+        view.Tool = PdfTool.SelectRegion;
+        Assert.True(view.BeginInteraction(runtime.Screen(new(5, 5))));
+        await view.EndInteractionAsync(runtime.Screen(new(245, 160)));
+        await workspace.SelectRegionObjectsCommand.ExecuteAsync(); runtime.Drain();
+        var original = workspace.SelectedContentObjects.ToArray(); Assert.Equal(2, original.Length);
+        var region = view.Selection!; Assert.True(workspace.AlignObjectsCommand.CanExecute(null));
+        workspace.ContentAlignment = PdfSelectionAlignment.Bottom;
+        await workspace.AlignObjectsCommand.ExecuteAsync(); runtime.Drain();
+        var actual = (await runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1)).Objects;
+        Assert.Equal(region.Bounds.Bottom, PdfContentSelection.Bounds(actual.Take(2)).Bottom, 3);
+        Assert.Equal(original[1].Bounds.Y - original[0].Bounds.Y, actual[1].Bounds.Y - actual[0].Bounds.Y, 3);
+        Assert.False(workspace.AlignObjectsCommand.CanExecute(null));
+        Assert.Null(view.Selection); Assert.Empty(view.SelectedContentObjects);
+    }
     private static PdfPoint Center(PdfRect r) => new(r.X + r.Width / 2, r.Y + r.Height / 2);
     private sealed class Runtime : IAsyncDisposable
     {

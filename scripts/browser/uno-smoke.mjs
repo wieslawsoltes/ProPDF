@@ -32,6 +32,13 @@ async function state() {
   lastState = await bounded(page.evaluate(() => JSON.parse(propdfTest.State())), 'state', 8000);
   return lastState;
 }
+async function objectsForSelection(label) {
+  const objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), label));
+  // PDF inspection and dispatcher bindings have different completion points.
+  // Wait for exact object identity in the real native list, without bypassing it.
+  await page.waitForFunction(() => propdfTest.ContentListReady(), null, { timeout: 15000 });
+  return objects;
+}
 async function command(name) {
   await progress(name);
   await bounded(page.evaluate(name => propdfTest.Click(name), name), name);
@@ -70,7 +77,7 @@ try {
   const failure = await bounded(page.evaluate(() => document.documentElement.dataset.propdfError), 'startup status');
   assert.equal(failure, undefined);
   await progress('load real PDF tiles and form inspector');
-  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.tiles > 0 && s.fields > 0; }, null, { timeout: 30000 });
+  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.tiles > 0 && s.fields > 0 && s.pageItems === s.pages; }, null, { timeout: 30000 });
   const initial = await healthy(); assert.equal(initial.pages, 3); assert.equal(initial.dirty, false);
   assert.ok(await page.locator('canvas').count() > 0); checks.push('real Uno/Skia application and PDF tiles');
   const original = await bounded(page.evaluate(() => propdfTest.TextContent()), 'independent text extraction');
@@ -91,6 +98,34 @@ try {
   }, initialPixels.toString('base64')), 'presented PDF pixels');
   assert.ok(painted > 1000, 'The real browser screenshot must show PDF content, not a blank canvas or splash.');
   checks.push('composited editor screenshot contains rendered PDF pixels');
+  await progress('rendered page thumbnails and pointer navigation');
+  await page.waitForFunction(() => JSON.parse(propdfTest.Thumbnails()).some(t => t.page === 2), null, { timeout: 15000 });
+  const thumbnails = JSON.parse(await bounded(page.evaluate(() => propdfTest.Thumbnails()), 'thumbnail geometry'));
+  const firstThumbnail = thumbnails.find(t => t.page === 1), secondThumbnail = thumbnails.find(t => t.page === 2);
+  assert.ok(firstThumbnail && secondThumbnail);
+  // Read pixels from the actual composited thumbnail region. A list of blank
+  // placeholders does not qualify as rendered thumbnails.
+  let thumbnailPixels = 0;
+  for (let attempt = 0; attempt < 10 && thumbnailPixels < 100; attempt++) {
+    const pixels = await page.screenshot({ timeout: 10000 });
+    thumbnailPixels = await bounded(page.evaluate(async ({ base64, bounds }) => {
+      const image = new Image(); image.src = 'data:image/png;base64,' + base64; await image.decode();
+      const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(Math.ceil(bounds.x), Math.ceil(bounds.y), Math.floor(bounds.width), Math.floor(bounds.height)).data;
+      let count = 0;
+      for (let i = 0; i < data.length; i += 4)
+        if (data[i] < 80 && data[i + 2] > data[i] + 25 && data[i + 2] > data[i + 1] + 15) count++;
+      return count;
+    }, { base64: pixels.toString('base64'), bounds: firstThumbnail }), 'composited thumbnail pixels');
+    if (thumbnailPixels < 100) await page.waitForTimeout(100);
+  }
+  assert.ok(thumbnailPixels >= 100, 'The first page thumbnail must contain the rendered blue PDF header.');
+  await page.screenshot({ path: `${out}/uno-desktop.png`, timeout: 10000 });
+  await page.mouse.click(secondThumbnail.x + secondThumbnail.width / 2, secondThumbnail.y + secondThumbnail.height / 2);
+  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.page === 2 && s.tiles > 0; }, null, { timeout: 15000 });
+  await healthy(); await command('PreviousPageButton'); assert.equal((await state()).page, 1);
+  checks.push('rendered page thumbnails and pointer page navigation');
   await writeFile(`${out}/controls.json`, await bounded(page.evaluate(() => propdfTest.Controls()), 'control geometry'));
   await writeFile(`${out}/accessibility.txt`, await page.locator('body').ariaSnapshot());
   await progress('real pointer rotation');
@@ -104,7 +139,7 @@ try {
   await text('SearchQueryInput', 'workspace'); await command('SearchButton'); assert.ok((await state()).matches > 0);
   await text('SearchQueryInput', ''); await command('SearchButton'); checks.push('search and clearing highlights');
   await section(0); await command('EditObjectsButton');
-  let objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'content inspection'));
+  let objects = await objectsForSelection('content inspection');
   const first = objects.find(o => o.text === 'Your documents.'), second = objects.find(o => o.text === 'Your workspace.');
   assert.ok(first?.editable && second?.editable);
   await bounded(page.evaluate(({ a, b }) => { propdfTest.SelectObject(a, false); propdfTest.SelectObject(b, true); }, { a: first.index, b: second.index }), 'native list selection');
@@ -113,7 +148,22 @@ try {
   const moved = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'inspect edited objects'));
   for (const before of [first, second]) assert.ok(Math.abs(moved.find(o => o.text === before.text).x - before.x - 12) < .1);
   await command('UndoButton'); checks.push('atomic native multi-selection editing and single undo');
-  objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'restored objects'));
+  objects = await objectsForSelection('objects before page alignment');
+  const members = objects.filter(o => o.text === 'Your documents.' || o.text === 'Your workspace.');
+  await bounded(page.evaluate(({a,b}) => { propdfTest.SelectObject(a, false); propdfTest.SelectObject(b, true); }, {a: members[0].index, b: members[1].index}), 'alignment selection');
+  await bounded(page.evaluate(() => propdfTest.Expand('AlignmentSection', true)), 'expand alignment');
+  await page.waitForTimeout(150);
+  const alignmentPageWidth = (await state()).pageWidth;
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentAlignmentReferenceChoice', 1)), 'page reference');
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentAlignmentChoice', 1)), 'horizontal center');
+  await command('AlignObjectsButton');
+  const aligned = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'page-aligned PDF content')).filter(o => members.some(m => m.text === o.text));
+  // Inspect resulting PDF objects against the document page size, not UI draft values.
+  const left = Math.min(...aligned.map(o => o.x)), right = Math.max(...aligned.map(o => o.x + o.width));
+  assert.ok(Math.abs((left + right) / 2 - alignmentPageWidth / 2) < .1);
+  assert.ok(Math.abs(aligned[1].x - aligned[0].x - members[1].x + members[0].x) < .1);
+  await command('UndoButton'); checks.push('page-relative group alignment through native controls and undo');
+  objects = await objectsForSelection('restored objects');
   await bounded(page.evaluate(i => propdfTest.SelectObject(i, false), objects.find(o => o.text === 'Your documents.').index), 'appearance selection');
   await text('ContentFillColorInput', '#D040A0'); await command('ApplyAppearanceButton');
   await section(4); await text('ExportDpiInput', '72');

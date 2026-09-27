@@ -89,3 +89,22 @@ var updated = await editor.ApplyAsync(snapshot, new IPdfEditOperation[] { operat
 `EditContentObjects` also accepts one typed edit per selected invocation. It resolves all handles against the original page inspection before rewriting its instruction ranges in original painting order. Mixed revisions/pages/fingerprints, duplicate handles, nested selections, stale or unsupported objects and invalid transforms are rejected. This avoids applying successive single-object operations whose first rewrite would invalidate the remaining fingerprints. Failed/cancelled edits do not publish a new snapshot. Use one aggregate operation, not a batch of independently inspected stale single-object edits.
 
 The selection is cleared on document revision/page changes. Existing PDFs are not rasterized, and shared image/Form resources are not overwritten by invocation transforms. This remains whole-invocation editing, not nested Form/span editing, rich paragraph reflow, exact ink selection or a sanitization guarantee.
+
+## Align to page or region
+
+The **Align relative to** selector is available in Avalonia, WPF and Uno. **Selection** retains the existing behavior: align two or more members to each other. **Page** translates the entire selection to an edge or center of its cropped, rotated page. **Region** translates the selection to a nonempty selected region on that same page and revision. Page and Region accept a single object and preserve relative member spacing; they do not resize the selection to fit. Oversized selections may remain outside the target rectangle.
+
+All six alignment directions use approximate logical bounds. The shared command produces one atomic transaction and one undo step. Region alignment is disabled when the region is absent, stale or on another page. Distribution continues to operate among selected objects and is independent of this reference selector.
+
+Standalone hosts can use the same geometry without any UI dependency:
+
+```csharp
+var items = (await editor.ReadPageContentAsync(snapshot, 1)).Objects.Take(2);
+var size = snapshot.GetPage(1).Size;
+var operation = PdfContentSelection.AlignToBounds(items,
+    new PdfRect(0, 0, size.Width, size.Height),
+    PdfSelectionAlignment.HorizontalCenter);
+await session.ApplyAsync(operation, snapshot.Id);
+```
+
+The selection limit, stale-handle checks, unsupported-content restrictions and fixed ancestor clipping still apply. Alignment is not redaction or general paragraph reflow.
