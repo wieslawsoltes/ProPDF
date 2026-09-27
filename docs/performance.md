@@ -25,3 +25,13 @@ Tile planning retains the 512-pixel tile edge and the 256-tile viewport limit. T
 `ViewportSchedulingTests` checks that 40 scroll updates within the same tile coverage add **zero** cache hits or misses, that such scrolling does not cancel an in-flight recording, and that progressive publication does not drop existing matching tiles. A queued dispatcher receives one notification for 100 immediate state updates and reads the final value. Zoom, revision replacement and viewport-budget failure/recovery are also tested.
 
 These are deterministic work-count and ownership assertions, not hardware timing claims. Run the tests on the target runtime and profile representative documents for throughput, memory and input latency. The browser CI additionally exercises actual Uno/Skia rendering and editing; desktop headless smoke tests cover Avalonia and WPF bindings and pixels.
+
+## Rendering completion and UI publication
+
+`PdfViewportController.WaitForRenderingAsync` waits for the latest tile plan, not
+for the host dispatcher or a presented compositor frame. A queued `Invalidated`
+notification can arrive later. Tests that inspect every progressive publication
+use an explicit synchronous dispatcher; tests of queued hosts explicitly drain
+their own queue. These completion points must not be conflated or replaced with
+fixed sleeps. Both modes retain the same production coalescing and tile-ownership
+behavior.
