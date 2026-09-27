@@ -75,6 +75,9 @@ jobs:
                 '07ae877f844e927f3feb1ecae418f70d158555041ad60a2419a3a561298dee95', True)
           subprocess.run(['python', 'scripts/verify-renderer-source.py'], check=True)
           PY
+          # Workflow changes are committed separately through the authorized repository connector.
+          # The temporary Actions token remains contents-only; do not broaden its permissions.
+          git restore --source=HEAD --staged --worktree .github/workflows/release.yml .github/workflows/validate.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat: native content appearance, isolated image replacement and corrected Skia image painting'
