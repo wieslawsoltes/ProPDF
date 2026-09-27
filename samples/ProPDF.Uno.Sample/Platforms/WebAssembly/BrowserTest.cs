@@ -75,10 +75,24 @@ public static partial class BrowserTest
     [JSExport]
     public static void Expand(string name, bool expanded)
     { if (Find(name) is not Expander section) throw new ArgumentException("Section not found: " + name); section.IsExpanded = expanded; }
+    // Loading PDF content completes before queued native binding updates. Tests
+    // must await the real list rather than assigning ItemsSource or sleeping.
+    [JSExport]
+    public static bool ContentListReady()
+    {
+        var list = (ListView)Find("ContentObjectsList");
+        var objects = Workspace.ContentObjects;
+        if (!ReferenceEquals(list.ItemsSource, objects) || list.Items.Count != objects.Count) return false;
+        for (var i = 0; i < objects.Count; i++)
+            if (!ReferenceEquals(list.Items[i], objects[i])) return false;
+        return true;
+    }
     [JSExport]
     public static void SelectObject(int index, bool extend)
     {
         var list = (ListView)Find("ContentObjectsList");
+        if (!ContentListReady()) throw new InvalidOperationException("Wait for the native content list to bind the current inspection.");
+        if ((uint)index >= (uint)list.Items.Count) throw new ArgumentOutOfRangeException(nameof(index));
         if (!extend) list.SelectedItems.Clear(); list.SelectedItems.Add(list.Items[index]);
     }
     [JSExport]

@@ -32,6 +32,13 @@ async function state() {
   lastState = await bounded(page.evaluate(() => JSON.parse(propdfTest.State())), 'state', 8000);
   return lastState;
 }
+async function objectsForSelection(label) {
+  const objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), label));
+  // PDF inspection and dispatcher bindings have different completion points.
+  // Wait for exact object identity in the real native list, without bypassing it.
+  await page.waitForFunction(() => propdfTest.ContentListReady(), null, { timeout: 15000 });
+  return objects;
+}
 async function command(name) {
   await progress(name);
   await bounded(page.evaluate(name => propdfTest.Click(name), name), name);
@@ -104,7 +111,7 @@ try {
   await text('SearchQueryInput', 'workspace'); await command('SearchButton'); assert.ok((await state()).matches > 0);
   await text('SearchQueryInput', ''); await command('SearchButton'); checks.push('search and clearing highlights');
   await section(0); await command('EditObjectsButton');
-  let objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'content inspection'));
+  let objects = await objectsForSelection('content inspection');
   const first = objects.find(o => o.text === 'Your documents.'), second = objects.find(o => o.text === 'Your workspace.');
   assert.ok(first?.editable && second?.editable);
   await bounded(page.evaluate(({ a, b }) => { propdfTest.SelectObject(a, false); propdfTest.SelectObject(b, true); }, { a: first.index, b: second.index }), 'native list selection');
@@ -113,7 +120,7 @@ try {
   const moved = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'inspect edited objects'));
   for (const before of [first, second]) assert.ok(Math.abs(moved.find(o => o.text === before.text).x - before.x - 12) < .1);
   await command('UndoButton'); checks.push('atomic native multi-selection editing and single undo');
-  objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'objects before page alignment'));
+  objects = await objectsForSelection('objects before page alignment');
   const members = objects.filter(o => o.text === 'Your documents.' || o.text === 'Your workspace.');
   await bounded(page.evaluate(({a,b}) => { propdfTest.SelectObject(a, false); propdfTest.SelectObject(b, true); }, {a: members[0].index, b: members[1].index}), 'alignment selection');
   await bounded(page.evaluate(() => propdfTest.Expand('AlignmentSection', true)), 'expand alignment');
@@ -128,7 +135,7 @@ try {
   assert.ok(Math.abs((left + right) / 2 - alignmentPageWidth / 2) < .1);
   assert.ok(Math.abs(aligned[1].x - aligned[0].x - members[1].x + members[0].x) < .1);
   await command('UndoButton'); checks.push('page-relative group alignment through native controls and undo');
-  objects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'restored objects'));
+  objects = await objectsForSelection('restored objects');
   await bounded(page.evaluate(i => propdfTest.SelectObject(i, false), objects.find(o => o.text === 'Your documents.').index), 'appearance selection');
   await text('ContentFillColorInput', '#D040A0'); await command('ApplyAppearanceButton');
   await section(4); await text('ExportDpiInput', '72');
