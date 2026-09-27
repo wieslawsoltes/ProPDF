@@ -63,9 +63,11 @@ jobs:
       - name: WPF software-rendered editor validation
         if: runner.os == 'Windows'
         run: dotnet run --project tests/ProPDF.Wpf.Smoke -c Release --no-build -- artifacts/headless/wpf.png
-      - name: Pack standalone libraries
+      - name: Pack all libraries including Uno library layout
         shell: pwsh
-        run: dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages "-p:Version=$env:PACKAGE_VERSION"
+        # Uno's library-layout target invokes reference builds; --no-build conflicts with that target.
+        # This reuses the same Release outputs incrementally and performs no additional restore.
+        run: dotnet pack ProPDF.slnx -c Release --no-restore -o artifacts/packages "-p:Version=$env:PACKAGE_VERSION"
       - name: External NuGet consumers
         shell: pwsh
         run: ./scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
