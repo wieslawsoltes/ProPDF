@@ -1,11 +1,13 @@
 <Project Sdk="Uno.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0-browserwasm;net10.0-desktop</TargetFrameworks>
+    <!-- Native CI validates the desktop graph on each OS; the dedicated browser
+         job restores/builds/audits both heads and executes real Chromium tests. -->
+    <TargetFrameworks Condition="'$(ProPDFBuildBrowser)' == 'false'">net10.0-desktop</TargetFrameworks>
     <TargetFramework />
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
     <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
-    <!-- No implicit service locator, commercial tooling, X11 video or Win32 SDK metadata. -->
     <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
     <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
