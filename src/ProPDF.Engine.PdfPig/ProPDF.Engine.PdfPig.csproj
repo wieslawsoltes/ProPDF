@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>PdfPig parsing, text search and Skia display-list backend for ProPDF.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Core/ProPDF.Core.csproj" />
+    <ProjectReference Include="../ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
+    <PackageReference Include="PdfPig.Rendering.Skia" />
+  </ItemGroup>
+</Project>
