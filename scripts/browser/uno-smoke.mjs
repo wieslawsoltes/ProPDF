@@ -75,14 +75,31 @@ try {
   assert.ok(await page.locator('canvas').count() > 0); checks.push('real Uno/Skia application and PDF tiles');
   const original = await bounded(page.evaluate(() => propdfTest.TextContent()), 'independent text extraction');
   assert.ok(original.includes('Your documents.')); checks.push('independent PDF text extraction');
-  await page.screenshot({ path: `${out}/uno-desktop.png`, timeout: 10000 });
+  // Readiness can precede the first compositor frame. Wait for the real splash
+  // to leave, then allow layout and composition to present the initialized app.
+  await page.locator('.uno-loader').waitFor({ state: 'hidden', timeout: 15000 });
+  await bounded(page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))), 'initial presentation');
+  const initialPixels = await page.screenshot({ path: `${out}/uno-desktop.png`, timeout: 10000 });
+  const painted = await bounded(page.evaluate(async base64 => {
+    const image = new Image(); image.src = 'data:image/png;base64,' + base64; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+    const data = ctx.getImageData(200, 180, 800, 600).data; let count = 0;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i] < 80 && data[i + 2] > data[i] + 25 && data[i + 2] > data[i + 1] + 15) count++;
+    return count;
+  }, initialPixels.toString('base64')), 'presented PDF pixels');
+  assert.ok(painted > 1000, 'The real browser screenshot must show PDF content, not a blank canvas or splash.');
+  checks.push('composited editor screenshot contains rendered PDF pixels');
   await writeFile(`${out}/controls.json`, await bounded(page.evaluate(() => propdfTest.Controls()), 'control geometry'));
   await writeFile(`${out}/accessibility.txt`, await page.locator('body').ariaSnapshot());
   await progress('real pointer rotation');
   const rotate = await bounded(page.evaluate(() => JSON.parse(propdfTest.Controls()).find(c => c.name === 'RotateButton')), 'rotate button');
   assert.ok(rotate && rotate.width > 0 && rotate.height > 0);
   await page.mouse.click(rotate.x + rotate.width / 2, rotate.y + rotate.height / 2);
-  await page.waitForFunction(revision => JSON.parse(propdfTest.State()).revision !== revision, initial.revision, { timeout: 15000 });
+  await page.waitForFunction(revision => {
+    const s = JSON.parse(propdfTest.State()); return s.error || (s.revision !== revision && !s.busy);
+  }, initial.revision, { timeout: 15000 });
   await healthy(); await command('UndoButton'); assert.equal((await state()).dirty, false); checks.push('pointer page rotation and undo');
   await text('SearchQueryInput', 'workspace'); await command('SearchButton'); assert.ok((await state()).matches > 0);
   await text('SearchQueryInput', ''); await command('SearchButton'); checks.push('search and clearing highlights');
