@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pin a supported Apple Silicon image rather than following automatic macOS image migrations.
-        os: [ubuntu-latest, windows-latest, macos-15]
+        # Explicit supported Apple Silicon image; retain all checks when changing runner image versions.
+        os: [ubuntu-latest, windows-latest, macos-26]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
