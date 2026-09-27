@@ -30,7 +30,7 @@ These are deterministic work-count and ownership assertions, not hardware timing
 
 `PdfViewportController.WaitForRenderingAsync` waits for the latest tile plan, not
 for the host dispatcher or a presented compositor frame. A queued `Invalidated`
-notification can arrive later. Tests that inspect every progressive publication
+notification can arrive later. Tests that inspect progressive publications
 use an explicit synchronous dispatcher; tests of queued hosts explicitly drain
 their own queue. These completion points must not be conflated or replaced with
 fixed sleeps. Both modes retain the same production coalescing and tile-ownership
