@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:ProPDF.Avalonia"
              x:Class="ProPDF.Avalonia.PdfEditor" x:Name="EditorRoot" x:CompileBindings="False" Background="#F4F6FA" Foreground="#17243C">
   <UserControl.Styles>
+    <Style Selector="TabItem"><Setter Property="FontSize" Value="12"/><Setter Property="Padding" Value="5,6"/></Style>
     <Style Selector="Button"><Setter Property="Margin" Value="3"/><Setter Property="Padding" Value="10,6"/><Setter Property="MinHeight" Value="30"/><Setter Property="FontSize" Value="12"/><Setter Property="CornerRadius" Value="6"/></Style>
     <Style Selector="Button.primary"><Setter Property="Background" Value="#315CE7"/><Setter Property="Foreground" Value="White"/></Style>
     <Style Selector="Button.danger"><Setter Property="Foreground" Value="#AD2941"/></Style>

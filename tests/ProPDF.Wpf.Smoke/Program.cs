@@ -51,6 +51,7 @@ internal static class Program
             application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             var editButton = Descendants(editor).OfType<Button>().Single(button => button.Name == "ApplyObjectBoundsButton");
             if (!ReferenceEquals(editButton.Command, workspace.ApplyObjectBoundsCommand)) throw new InvalidOperationException("Native object-edit command binding is missing.");
+            if (runtime.Viewport.Tool != ProPDF.Presentation.PdfTool.EditObject) throw new InvalidOperationException("Native selector reset the content-edit tool.");
             var originalObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
             workspace.SelectedContentObject = originalObject;
             workspace.ContentX = (originalObject.Bounds.X + 12).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -72,6 +73,7 @@ internal static class Program
             Pump(runtime.Viewport.WaitForRenderingAsync());
             application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
+            if (runtime.Viewport.Tool != ProPDF.Presentation.PdfTool.EditObject) throw new InvalidOperationException("Native selector reset the active tool after viewport updates.");
             if (runtime.Viewport.LastError is { } error) throw new InvalidOperationException(error);
             using (var scene = runtime.Viewport.CaptureScene())
                 if (scene.TileCount == 0) throw new InvalidOperationException("No PDF tiles rendered.");

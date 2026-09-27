@@ -133,7 +133,24 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     public string DocumentKeywords { get => _keywords; set => Set(ref _keywords, value ?? ""); }
     public PdfLayoutMode[] LayoutModes { get; } = Enum.GetValues<PdfLayoutMode>();
     public PdfLayoutMode LayoutMode { get => Viewport.LayoutMode; set { if (Viewport.LayoutMode != value) { Viewport.SetLayoutMode(value); Changed(); } } }
-    public IReadOnlyList<PdfToolDescriptor> Tools => AllTools.Where(item => Available(item.Tool)).ToArray();
+    private IReadOnlyList<PdfToolDescriptor>? _availableTools;
+    private int _availableToolMask;
+    public IReadOnlyList<PdfToolDescriptor> Tools
+    {
+        get
+        {
+            // Stable ItemsSource identity prevents native selectors from resetting selection on each viewport notification.
+            var mask = 0;
+            for (var index = 0; index < AllTools.Length; index++)
+                if (Available(AllTools[index].Tool)) mask |= 1 << index;
+            if (_availableTools is null || mask != _availableToolMask)
+            {
+                _availableToolMask = mask;
+                _availableTools = Array.AsReadOnly(AllTools.Where((_, index) => (mask & (1 << index)) != 0).ToArray());
+            }
+            return _availableTools;
+        }
+    }
     public PdfToolDescriptor? SelectedTool
     {
         get => AllTools.FirstOrDefault(item => item.Tool == Viewport.Tool);

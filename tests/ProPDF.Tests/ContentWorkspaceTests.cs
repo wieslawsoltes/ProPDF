@@ -88,6 +88,19 @@ public sealed class ContentWorkspaceTests
         view.ConfigureContentService(runtime.Editor); await view.LoadContentAsync();
         Assert.All(view.ContentObjects, item => Assert.Equal(view.Document.Id, item.Reference.Revision));
     }
+    [Fact]
+    public async Task ToolItemsRemainStableAcrossViewportAndInspectionNotifications()
+    {
+        await using var runtime = await Runtime.CreateAsync();
+        using var workspace = new PdfWorkspace(new(runtime.View, runtime.Editor), new Dialogs(), runtime.Dispatch);
+        var tools = workspace.Tools;
+        await workspace.EditObjectsCommand.ExecuteAsync(); runtime.Drain();
+        Assert.Same(tools, workspace.Tools);
+        runtime.View.SetZoom(1.2); await runtime.View.WaitForRenderingAsync(); runtime.Drain();
+        Assert.Same(tools, workspace.Tools);
+        Assert.Equal(PdfTool.EditObject, workspace.SelectedTool!.Tool);
+        Assert.Contains(workspace.SelectedTool, tools);
+    }
     private sealed class DelayedContent(IPdfContentService inner) : IPdfContentService
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
