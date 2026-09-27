@@ -7,7 +7,7 @@ on:
       version:
         description: 'SemVer without v'
         required: true
-        default: '0.1.0-alpha.1'
+        default: '0.1.0-alpha.2'
       publish:
         description: 'Publish the exact matching tag reachable from main; requires NuGet credentials and environment approval'
         type: boolean
@@ -93,22 +93,35 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
-      - name: Self-contained sample archives
+      - name: Restore complete dependency graph
+        run: dotnet restore ProPDF.slnx
+      - name: Publish self-contained samples
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           dotnet publish samples/ProPDF.Avalonia.Sample -c Release -r $env:RID --self-contained true -p:PublishTrimmed=false "-p:Version=$env:VERSION" -o artifacts/avalonia
           if ($LASTEXITCODE -ne 0) { throw 'Avalonia publish failed' }
-          New-Item artifacts/release -ItemType Directory -Force | Out-Null
-          # Include source-level and dependency licensing notices with binary distributions.
-          Copy-Item LICENSE artifacts/avalonia/
-          Copy-Item src/ProPDF.Editing.iText/LICENSE-NOTICE.md artifacts/avalonia/
           if ($IsWindows) {
-            Compress-Archive artifacts/avalonia/* "artifacts/release/ProPDF-Avalonia-$env:VERSION-$env:RID.zip"
             dotnet publish samples/ProPDF.Wpf.Sample -c Release -r $env:RID --self-contained true -p:PublishTrimmed=false "-p:Version=$env:VERSION" -o artifacts/wpf
             if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed' }
+          }
+      - name: Audit resolved runtime dependencies and collect notices
+        run: python scripts/audit-licenses.py
+      - name: Archive samples with dependency notices
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item artifacts/release -ItemType Directory -Force | Out-Null
+          Copy-Item LICENSE artifacts/avalonia/
+          Copy-Item THIRD-PARTY-NOTICES.md artifacts/avalonia/
+          Copy-Item artifacts/third-party-notices artifacts/avalonia/third-party-notices -Recurse
+          Copy-Item artifacts/licenses.json artifacts/avalonia/licenses.json
+          if ($IsWindows) {
+            Compress-Archive artifacts/avalonia/* "artifacts/release/ProPDF-Avalonia-$env:VERSION-$env:RID.zip"
             Copy-Item LICENSE artifacts/wpf/
-            Copy-Item src/ProPDF.Editing.iText/LICENSE-NOTICE.md artifacts/wpf/
+            Copy-Item THIRD-PARTY-NOTICES.md artifacts/wpf/
+            Copy-Item artifacts/third-party-notices artifacts/wpf/third-party-notices -Recurse
+            Copy-Item artifacts/licenses.json artifacts/wpf/licenses.json
             Compress-Archive artifacts/wpf/* "artifacts/release/ProPDF-WPF-$env:VERSION-$env:RID.zip"
           } else {
             tar -czf "artifacts/release/ProPDF-Avalonia-$env:VERSION-$env:RID.tar.gz" -C artifacts/avalonia .
@@ -120,7 +133,7 @@ jobs:
           path: artifacts/release
   publish:
     if: needs.prepare.outputs.publish == 'true'
-    needs: [prepare, validation, documentation, applications]
+    needs: [prepare, validation,documentation, applications]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: nuget-release
