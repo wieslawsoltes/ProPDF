@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace ProPDF.Presentation;
 
-public enum PdfOverlayKind { Selection, Search, Redaction, Content }
+public enum PdfOverlayKind { Selection, Search, Redaction, Content, ContentMember }
 public sealed record PdfPageVisual(int PageNumber, PdfRect Bounds);
 public sealed record PdfOverlay(PdfRect Bounds, PdfOverlayKind Kind);
 internal sealed record PdfTileVisual(SkiaTileLease Tile, PdfRect Bounds);
@@ -68,7 +68,7 @@ public sealed class PdfScene : IDisposable
                     _ => new SKColor(55, 110, 235, 58)
                 };
                 paint.Style = SKPaintStyle.Fill;
-                if (overlay.Kind != PdfOverlayKind.Content) canvas.DrawRect(Rect(overlay.Bounds), paint);
+                if (overlay.Kind is not (PdfOverlayKind.Content or PdfOverlayKind.ContentMember)) canvas.DrawRect(Rect(overlay.Bounds), paint);
                 if (overlay.Kind != PdfOverlayKind.Search)
                 {
                     paint.Style = SKPaintStyle.Stroke;

@@ -62,7 +62,7 @@ public sealed class PdfView : FrameworkElement
         if (e.ChangedButton is not (MouseButton.Left or MouseButton.Middle)) return;
         Focus();
         var point = e.GetPosition(this);
-        if (Controller?.BeginInteraction(new PdfPoint(point.X, point.Y), e.ChangedButton == MouseButton.Middle) == true)
+        if (Controller?.BeginInteraction(new PdfPoint(point.X, point.Y), e.ChangedButton == MouseButton.Middle, (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != 0) == true)
         { CaptureMouse(); e.Handled = true; }
     }
     protected override void OnMouseMove(MouseEventArgs e)

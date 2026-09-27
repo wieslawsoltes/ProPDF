@@ -137,3 +137,7 @@ Tile rendering uses device-space origin alignment and a small gutter. Display-li
 The shared Edit inspector now changes native text/path colors, local stroke width/cap/join/dashes, path painting, opacity and blend mode. Text keeps its original fonts and positioning; following objects retain their prior graphics state. Image replacement changes one invocation without overwriting images shared by other pages. Static image authoring handles sRGB/straight-alpha soft masks and all eight EXIF orientations. Image interpolation is editable and honored by the corrected rendering adapter.
 
 Revisions, input validation, pixel budgets and undo apply to these operations. Zero opacity and clipping are not redaction. See [Appearance and images](docs/content-appearance.md) for exact alpha semantics, resource isolation, renderer-source provenance and remaining graphics/color-management boundaries.
+
+### Multi-object editing
+
+The Edit inspector and canvas support same-page multiple selection, atomic group transforms, duplication/deletion, alignment and distribution. All selected handles are checked against one original inspection, preserving painting order and one-step undo. See [multi-object selection](docs/content-editing.md#multi-object-selection-and-atomic-editing) for the 1,000-object limit, approximate-bound behavior and unsupported cases.

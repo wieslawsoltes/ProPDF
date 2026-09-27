@@ -270,10 +270,38 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
     private static string MatrixCommand(PdfAffineTransform m) => $"{F(m.A)} {F(m.B)} {F(m.C)} {F(m.D)} {F(m.E)} {F(m.F)} cm\n";
     private static void EditContentObject(PdfGraph graph, PdfContentObjectEdit edit, CancellationToken token)
     {
-        var handle = edit.Object ?? throw new ArgumentNullException(nameof(edit.Object)); var page = graph.Page(handle.PageNumber);
+        var edits = edit is EditContentObjects selection ? selection.Edits.ToArray() : new[] { edit };
+        var handle = edit.Object ?? throw new ArgumentNullException(nameof(edit.Object));
+        if (edit is EditContentObjects && handle != edits[0].Object) throw new PdfRevisionConflictException();
+        var page = graph.Page(handle.PageNumber);
         var analysis = AnalyzeContent(graph, handle.PageNumber, null, token);
-        if (analysis.Fingerprint != handle.Fingerprint || handle.Index < 0 || handle.Index >= analysis.Nodes.Count) throw new PdfRevisionConflictException();
-        var node = analysis.Nodes[handle.Index]; if (node.Reason is not null) throw new NotSupportedException(node.Reason);
+        // Resolve every handle against the original inspection, before allocating replacements.
+        var targets = edits.Select(item =>
+        {
+            var reference = item.Object ?? throw new ArgumentNullException(nameof(item.Object));
+            if (reference.Revision != handle.Revision || reference.PageNumber != handle.PageNumber ||
+                analysis.Fingerprint != reference.Fingerprint || reference.Index < 0 || reference.Index >= analysis.Nodes.Count)
+                throw new PdfRevisionConflictException();
+            var target = analysis.Nodes[reference.Index];
+            if (target.Reason is not null) throw new NotSupportedException(target.Reason);
+            return (Edit: item, Node: target);
+        }).OrderBy(item => item.Node.First).ToArray();
+        var rewritten = new List<PdfContentInstruction>(); var cursor = 0;
+        foreach (var target in targets)
+        {
+            token.ThrowIfCancellationRequested();
+            if (target.Node.First < cursor) throw new ArgumentException("Selected content ranges overlap.");
+            while (cursor < target.Node.First) rewritten.Add(analysis.Instructions[cursor++]);
+            rewritten.AddRange(BuildContentReplacement(graph, page, analysis, target.Node, target.Edit, token));
+            cursor = target.Node.Last + 1;
+        }
+        while (cursor < analysis.Instructions.Count) rewritten.Add(analysis.Instructions[cursor++]);
+        page.Dictionary["Contents"] = graph.File.Add(PdfStream.FromDecoded(PdfContent.Write(rewritten, cancellationToken: token)));
+    }
+    private static IReadOnlyList<PdfContentInstruction> BuildContentReplacement(PdfGraph graph, NativePage page,
+        ContentAnalysis analysis, ContentNode node, PdfContentObjectEdit edit, CancellationToken token)
+    {
+        var handle = edit.Object;
         var original = analysis.Instructions.Skip(node.First).Take(node.Last - node.First + 1).ToArray();
         var replacement = new List<PdfContentInstruction>();
         void Commands(string commands) => replacement.AddRange(PdfContent.Read(Encoding.ASCII.GetBytes(commands), cancellationToken: token));
@@ -308,7 +336,6 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
                 Commands("q\n" + MatrixCommand(node.StartMatrix.Inverse()) + authored + "Q\n"); replacement.AddRange(node.StateEffects); break;
             default: throw new NotSupportedException("Unknown content-object operation.");
         }
-        var rewritten = analysis.Instructions.Take(node.First).Concat(replacement).Concat(analysis.Instructions.Skip(node.Last + 1));
-        page.Dictionary["Contents"] = graph.File.Add(PdfStream.FromDecoded(PdfContent.Write(rewritten, cancellationToken: token)));
+        return replacement;
     }
 }

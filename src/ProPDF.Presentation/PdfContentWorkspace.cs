@@ -5,15 +5,28 @@ namespace ProPDF.Presentation;
 
 public sealed partial class PdfWorkspace
 {
-    private PdfContentObjectReference? _contentEditorReference;
+    private IReadOnlyList<PdfContentObject>? _contentEditorSelection;
     private string _contentX = "0", _contentY = "0", _contentWidth = "100", _contentHeight = "40", _contentText = "", _contentFontSize = "14";
     private PdfUiCommand? _editObjects, _refreshObjects, _applyBounds, _deleteObject, _duplicateObject, _rotateObject, _flipObject, _replaceObjectText, _clipObject;
+    private PdfUiCommand? _selectAllObjects, _selectRegionObjects, _clearObjects, _alignObjects, _distributeObjects;
+    private PdfSelectionAlignment _contentAlignment;
+    private PdfSelectionDistribution _contentDistribution;
     public IReadOnlyList<PdfContentObject> ContentObjects => Viewport.ContentObjects;
+    public IReadOnlyList<PdfContentObject> SelectedContentObjects => Viewport.SelectedContentObjects;
     public string ContentStatus => Viewport.ContentStatus;
+    public string ContentSelectionSummary => $"{SelectedContentObjects.Count} selected · Ctrl/Command or Shift-click to extend selection";
     public PdfContentObject? SelectedContentObject
     {
         get => Viewport.SelectedContentObject;
-        set { if (value != Viewport.SelectedContentObject) { Viewport.SelectContentObject(value); RefreshContentState(); Changed(null); RefreshCommands(); } }
+        set
+        {
+            if (value != Viewport.SelectedContentObject || SelectedContentObjects.Count > 1)
+                SelectContentObjects(value is null ? [] : [value]);
+        }
+    }
+    public void SelectContentObjects(IEnumerable<PdfContentObject> values)
+    {
+        Viewport.SelectContentObjects(values); RefreshContentState(); Changed(null); RefreshCommands();
     }
     public string ContentX { get => _contentX; set => Set(ref _contentX, value); }
     public string ContentY { get => _contentY; set => Set(ref _contentY, value); }
@@ -31,34 +44,70 @@ public sealed partial class PdfWorkspace
     }
     public PdfTextAlignment[] TextAlignments { get; } = Enum.GetValues<PdfTextAlignment>();
     public PdfTextAlignment TextAlignment { get => Viewport.TextBoxAlignment; set { Viewport.TextBoxAlignment = value; Changed(); } }
-    private bool CanEditContent() => Can(PdfCapability.ContentReplacement) && SelectedContentObject is { CanEdit: true } item && item.Reference.Revision == Document?.Id;
+    public IReadOnlyList<PdfSelectionAlignment> ContentAlignments { get; } = Array.AsReadOnly(Enum.GetValues<PdfSelectionAlignment>());
+    public IReadOnlyList<PdfSelectionDistribution> ContentDistributions { get; } = Array.AsReadOnly(Enum.GetValues<PdfSelectionDistribution>());
+    public PdfSelectionAlignment ContentAlignment { get => _contentAlignment; set { if (Enum.IsDefined(value)) Set(ref _contentAlignment, value); } }
+    public PdfSelectionDistribution ContentDistribution { get => _contentDistribution; set { if (Enum.IsDefined(value)) Set(ref _contentDistribution, value); } }
+    // Appearance, image and text replacement tools require exactly one selected object.
+    private bool CanEditContent() => SelectedContentObjects.Count == 1 && CanEditContentSelection();
+    private bool CanEditContentSelection() => Can(PdfCapability.ContentReplacement) && SelectedContentObjects.Count > 0 &&
+        SelectedContentObjects.All(item => item.CanEdit && item.Reference.Revision == Document?.Id);
     private bool CanInspectContent() => HasDocument() && _context.Inspector is IPdfContentService;
     public PdfUiCommand EditObjectsCommand => _editObjects ??= Command(async token =>
     { Viewport.Tool = PdfTool.EditObject; await Viewport.LoadContentAsync(cancellationToken: token); }, CanInspectContent);
     public PdfUiCommand RefreshObjectsCommand => _refreshObjects ??= Command(token => Viewport.LoadContentAsync(force: true, cancellationToken: token), CanInspectContent);
+    public PdfUiCommand SelectAllObjectsCommand => _selectAllObjects ??= Command(async token =>
+    {
+        await Viewport.LoadContentAsync(cancellationToken: token);
+        SelectContentObjects(ContentObjects);
+        Viewport.Tool = PdfTool.EditObject;
+    }, CanInspectContent);
+    public PdfUiCommand SelectRegionObjectsCommand => _selectRegionObjects ??= Command(async token =>
+    {
+        var region = Viewport.Selection ?? throw new InvalidOperationException("Select a page region first.");
+        await Viewport.LoadContentAsync(region.PageNumber, cancellationToken: token);
+        if (Document?.Id != region.Revision) throw new PdfRevisionConflictException();
+        SelectContentObjects(ContentObjects.Where(item => item.Bounds.Intersects(region.Bounds)));
+        Viewport.Tool = PdfTool.EditObject;
+    }, () => CanInspectContent() && Viewport.Selection is { Bounds.IsEmpty: false } region && region.Revision == Document?.Id);
+    public PdfUiCommand ClearObjectsCommand => _clearObjects ??= Command(_ =>
+    { SelectContentObjects([]); return Task.CompletedTask; }, () => SelectedContentObjects.Count != 0);
     public PdfUiCommand ApplyObjectBoundsCommand => _applyBounds ??= Command(token =>
     {
-        var item = SelectedContentObject!;
-        return Session.ApplyAsync(new TransformContentObject(item.Reference, PdfViewportController.BoundsTransform(item.Bounds, ContentBounds())), item.Reference.Revision, token);
-    }, CanEditContent);
+        var items = SelectedContentObjects;
+        var transform = PdfViewportController.BoundsTransform(PdfContentSelection.Bounds(items), ContentBounds());
+        return Session.ApplyAsync(PdfContentSelection.Transform(items, transform), items[0].Reference.Revision, token);
+    }, CanEditContentSelection);
     public PdfUiCommand DeleteObjectCommand => _deleteObject ??= Command(token =>
     {
-        var item = SelectedContentObject!; return Session.ApplyAsync(new DeleteContentObject(item.Reference), item.Reference.Revision, token);
-    }, CanEditContent);
+        var items = SelectedContentObjects;
+        return Session.ApplyAsync(PdfContentSelection.Delete(items), items[0].Reference.Revision, token);
+    }, CanEditContentSelection);
     public PdfUiCommand DuplicateObjectCommand => _duplicateObject ??= Command(token =>
     {
-        var item = SelectedContentObject!; return Session.ApplyAsync(new DuplicateContentObject(item.Reference, PdfAffineTransform.Translation(12, 12)), item.Reference.Revision, token);
-    }, CanEditContent);
+        var items = SelectedContentObjects;
+        return Session.ApplyAsync(PdfContentSelection.Duplicate(items, PdfAffineTransform.Translation(12, 12)), items[0].Reference.Revision, token);
+    }, CanEditContentSelection);
     public PdfUiCommand RotateObjectCommand => _rotateObject ??= Command(token =>
     {
-        var item = SelectedContentObject!; var bounds = item.Bounds;
-        return Session.ApplyAsync(new TransformContentObject(item.Reference, PdfAffineTransform.RotationAt(90, new(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2))), item.Reference.Revision, token);
-    }, CanEditContent);
+        var items = SelectedContentObjects; var bounds = PdfContentSelection.Bounds(items);
+        return Session.ApplyAsync(PdfContentSelection.Transform(items, PdfAffineTransform.RotationAt(90, new(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2))), items[0].Reference.Revision, token);
+    }, CanEditContentSelection);
     public PdfUiCommand FlipObjectCommand => _flipObject ??= Command(token =>
     {
-        var item = SelectedContentObject!; var bounds = item.Bounds;
-        return Session.ApplyAsync(new TransformContentObject(item.Reference, PdfAffineTransform.ScaleAt(-1, 1, new(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2))), item.Reference.Revision, token);
-    }, CanEditContent);
+        var items = SelectedContentObjects; var bounds = PdfContentSelection.Bounds(items);
+        return Session.ApplyAsync(PdfContentSelection.Transform(items, PdfAffineTransform.ScaleAt(-1, 1, new(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2))), items[0].Reference.Revision, token);
+    }, CanEditContentSelection);
+    public PdfUiCommand AlignObjectsCommand => _alignObjects ??= Command(token =>
+    {
+        var items = SelectedContentObjects;
+        return Session.ApplyAsync(PdfContentSelection.Align(items, ContentAlignment), items[0].Reference.Revision, token);
+    }, () => CanEditContentSelection() && SelectedContentObjects.Count >= 2);
+    public PdfUiCommand DistributeObjectsCommand => _distributeObjects ??= Command(token =>
+    {
+        var items = SelectedContentObjects;
+        return Session.ApplyAsync(PdfContentSelection.Distribute(items, ContentDistribution), items[0].Reference.Revision, token);
+    }, () => CanEditContentSelection() && SelectedContentObjects.Count >= 3);
     public PdfUiCommand ReplaceObjectTextCommand => _replaceObjectText ??= Command(token =>
     {
         var item = SelectedContentObject!; var size = ContentNumber(ContentFontSize); Viewport.TextBoxFontSize = size;
@@ -75,13 +124,13 @@ public sealed partial class PdfWorkspace
     private void RefreshContentState()
     {
         if (Viewport.Tool == PdfTool.EditObject && CanInspectContent()) _ = Viewport.LoadContentAsync();
-        var item = SelectedContentObject;
-        if (_contentEditorReference == item?.Reference) return;
-        _contentEditorReference = item?.Reference;
-        ResetAppearanceDraft(item);
-        if (item is null) return;
+        var items = SelectedContentObjects;
+        if (ReferenceEquals(_contentEditorSelection, items)) return;
+        _contentEditorSelection = items;
+        ResetAppearanceDraft(items.Count == 1 ? items[0] : null);
+        _contentText = items.Count == 1 ? items[0].Text ?? "" : "";
+        if (Viewport.ContentSelectionBounds is not { } bounds) return;
         static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
-        _contentX = Number(item.Bounds.X); _contentY = Number(item.Bounds.Y); _contentWidth = Number(item.Bounds.Width); _contentHeight = Number(item.Bounds.Height);
-        _contentText = item.Text ?? "";
+        _contentX = Number(bounds.X); _contentY = Number(bounds.Y); _contentWidth = Number(bounds.Width); _contentHeight = Number(bounds.Height);
     }
 }

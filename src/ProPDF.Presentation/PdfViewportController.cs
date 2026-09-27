@@ -33,6 +33,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
     private bool _disposed;
     private bool _isRendering;
     private string? _lastError;
+    private string? _renderError;
     private PdfSelection? _selection;
     private IReadOnlyList<PdfSearchHit> _searchHits = Array.Empty<PdfSearchHit>();
     private int _searchIndex = -1;
@@ -62,7 +63,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
     public int PageCount { get { lock (_gate) return _snapshot?.Pages.Count ?? 0; } }
     public PdfLayoutMode LayoutMode { get { lock (_gate) return _mode; } }
     public bool IsRendering { get { lock (_gate) return _isRendering; } }
-    public string? LastError { get { lock (_gate) return _lastError; } }
+    public string? LastError { get { lock (_gate) return _lastError ?? _renderError; } }
     public PdfSelection? Selection { get { lock (_gate) return _selection; } }
     public string SelectedText { get { lock (_gate) return _selectedText; } }
     public IReadOnlyList<PdfSearchHit> SearchHits { get { lock (_gate) return _searchHits; } }
@@ -98,7 +99,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             foreach (var tile in _tiles) tile.Dispose();
             _tiles.Clear();
             _tileRevision = null;
-            _lastError = null;
+            _lastError = null; _renderError = null;
             RebuildLayout();
         }
         ScheduleRender();
@@ -151,7 +152,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             var hit = HitTestLocked(point);
             var ratio = value / _zoom;
             _zoom = value;
-            _drag = null; _objectDrag = null; _objectPreview = _selectedObject?.Bounds;
+            _drag = null; _objectDrag = null; _objectPreview = _selectionBounds;
             RebuildLayout();
             if (hit is { } target && _placements.TryGetValue(target.PageNumber, out var placement))
                 _offset = new PdfPoint(placement.Bounds.X + target.Point.X * _layout!.Scale - point.X,
@@ -287,7 +288,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error)
         {
-            lock (_gate) if (state.Generation == _generation && !_disposed) _lastError = error.Message;
+            lock (_gate) if (state.Generation == _generation && !_disposed) _renderError = error.Message;
         }
         finally
         {
@@ -307,7 +308,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             foreach (var tile in _tiles) tile.Dispose();
             _tiles = leases;
             _tileRevision = state.Document.Id;
-            _lastError = null;
+            _renderError = null;
         }
         Notify();
     }
@@ -333,7 +334,15 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             }
             foreach (var hit in _searchHits)
                 if (map.ContainsKey(hit.PageNumber)) foreach (var bounds in hit.Bounds) Overlay(hit.PageNumber, bounds, PdfOverlayKind.Search);
-            if (_selectedObject is { } selectedObject && _objectPreview is { } preview) Overlay(selectedObject.Reference.PageNumber, preview, PdfOverlayKind.Content);
+            if (_selectedObject is { } selectedObject && _objectPreview is { } preview)
+            {
+                if (_selectedObjects.Count > 1)
+                {
+                    var transform = _objectDrag is { } drag ? BoundsTransform(drag.Bounds, preview) : PdfAffineTransform.Identity;
+                    foreach (var member in _selectedObjects) Overlay(member.Reference.PageNumber, transform.Map(member.Bounds), PdfOverlayKind.ContentMember);
+                }
+                Overlay(selectedObject.Reference.PageNumber, preview, PdfOverlayKind.Content);
+            }
             if (_selection is { } selection) Overlay(selection.PageNumber, selection.Bounds, PdfOverlayKind.Selection);
             foreach (var redaction in _redactions) Overlay(redaction.PageNumber, redaction.Bounds, PdfOverlayKind.Redaction);
             return new PdfScene(_viewport, pages, tiles.ToArray(), overlays.ToArray());
@@ -375,6 +384,8 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
         Invalidated?.Invoke(this, EventArgs.Empty);
     });
     public void ReportError(Exception error) { lock (_gate) _lastError = error.Message; Notify(); }
+    /// <summary>Clears an editing/host diagnostic without discarding active rendering failures.</summary>
+    public void ClearError() { lock (_gate) _lastError = null; Notify(); }
     private static void Cancel(CancellationTokenSource? source) { try { source?.Cancel(); } catch (ObjectDisposedException) { } }
 
     public async ValueTask DisposeAsync()

@@ -7,12 +7,19 @@ public sealed partial class PdfViewportController
     private IPdfContentService? _contentService;
     private PdfPageContent? _contentPage;
     private PdfContentObject? _selectedObject;
+    private IReadOnlyList<PdfContentObject> _selectedObjects = Array.Empty<PdfContentObject>();
+    private PdfRect? _selectionBounds;
+    public IReadOnlyList<PdfContentObject> SelectedContentObjects { get { lock (_gate) return _selectedObjects; } }
+    public PdfRect? ContentSelectionBounds { get { lock (_gate) return _selectionBounds; } }
     private PdfRect? _objectPreview;
     private string? _contentError;
     private (Guid Revision, int Page)? _contentRequest;
     private Task _contentTask = Task.CompletedTask;
     private long _contentGeneration;
-    private sealed record ObjectDrag(PdfContentObject Object, PdfPoint Start, int Corner);
+    private sealed record ObjectDrag(IReadOnlyList<PdfContentObject> Objects, PdfRect Bounds, PdfPoint Start, int Corner)
+    {
+        public PdfContentObject Object => Objects[^1];
+    }
     private ObjectDrag? _objectDrag;
     public IReadOnlyList<PdfContentObject> ContentObjects { get { lock (_gate) return _contentPage?.Objects ?? Array.Empty<PdfContentObject>(); } }
     public PdfContentObject? SelectedContentObject { get { lock (_gate) return _selectedObject; } }
@@ -32,7 +39,7 @@ public sealed partial class PdfViewportController
     }
     private void ResetContentLocked()
     {
-        _contentGeneration++; _contentPage = null; _contentRequest = null; _selectedObject = null; _objectPreview = null; _objectDrag = null; _contentError = null;
+        _contentGeneration++; _contentPage = null; _contentRequest = null; SetSelectedObjectsLocked([]); _objectDrag = null; _contentError = null;
     }
     /// <summary>Loads one page's content lazily. Stale or cancelled reads never replace the current inspection.</summary>
     public Task LoadContentAsync(int? pageNumber = null, bool force = false, CancellationToken cancellationToken = default)
@@ -44,7 +51,7 @@ public sealed partial class PdfViewportController
             if (_snapshot is not { } document || _contentService is not { } service) return Task.CompletedTask;
             var number = pageNumber ?? _currentPage; document.GetPage(number); var request = (document.Id, number);
             if (!force && _contentRequest == request) return _contentTask.WaitAsync(cancellationToken);
-            if (_contentRequest != request) { _contentPage = null; _selectedObject = null; _objectPreview = null; _objectDrag = null; }
+            if (_contentRequest != request) { _contentPage = null; SetSelectedObjectsLocked([]); _objectDrag = null; }
             _contentRequest = request; var generation = ++_contentGeneration; var lifetime = _lifetime.Token; _contentError = null;
             task = Task.Run(async () =>
             {
@@ -57,7 +64,7 @@ public sealed partial class PdfViewportController
                     {
                         if (_disposed || generation != _contentGeneration || _snapshot?.Id != document.Id) return;
                         _contentPage = content;
-                        if (_selectedObject?.Reference.PageNumber != number) { _selectedObject = null; _objectPreview = null; }
+                        if (_selectedObject?.Reference.PageNumber != number) { SetSelectedObjectsLocked([]); }
                     }
                 }
                 catch (OperationCanceledException) when (linked.IsCancellationRequested)
@@ -66,7 +73,7 @@ public sealed partial class PdfViewportController
                 }
                 catch (Exception error)
                 {
-                    lock (_gate) if (!_disposed && generation == _contentGeneration) { _contentError = error.Message; _contentPage = null; _selectedObject = null; _objectPreview = null; }
+                    lock (_gate) if (!_disposed && generation == _contentGeneration) { _contentError = error.Message; _contentPage = null; SetSelectedObjectsLocked([]); }
                 }
                 finally { Notify(); }
             });
@@ -75,19 +82,40 @@ public sealed partial class PdfViewportController
         }
         Notify(); return task;
     }
-    public void SelectContentObject(PdfContentObject? value)
+    public void SelectContentObject(PdfContentObject? value) => SelectContentObjects(value is null ? [] : [value]);
+
+    /// <summary>Selects up to 1000 inspected objects on one page. An invalid selection leaves the existing selection intact.</summary>
+    public void SelectContentObjects(IEnumerable<PdfContentObject> values)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        var items = values.Take(EditContentObjects.MaximumSelection + 1).ToArray();
+        if (items.Length > EditContentObjects.MaximumSelection) throw new ArgumentException("The selection exceeds 1000 objects.", nameof(values));
         lock (_gate)
         {
             if (_disposed) return;
-            if (value is not null && (value.Reference.Revision != _snapshot?.Id || _contentPage?.Objects.Contains(value) != true)) throw new PdfRevisionConflictException();
-            _selectedObject = value; _objectPreview = value?.Bounds; _objectDrag = null;
+            if (items.Length > 0)
+            {
+                _ = PdfContentSelection.Bounds(items);
+                var available = _contentPage?.Objects.ToDictionary(o => o.Reference);
+                if (available is null || items.Any(o => o.Reference.Revision != _snapshot?.Id ||
+                    !available.TryGetValue(o.Reference, out var inspected) || inspected != o)) throw new PdfRevisionConflictException();
+            }
+            if (_selectedObjects.SequenceEqual(items)) return;
+            SetSelectedObjectsLocked(items);
         }
         Notify();
     }
-    private bool BeginObjectInteraction(PdfPoint point)
+    private void SetSelectedObjectsLocked(PdfContentObject[] items)
     {
-        int? load = null; bool selected = false;
+        _selectionBounds = items.Length == 0 ? null : PdfContentSelection.Bounds(items);
+        _selectedObjects = Array.AsReadOnly(items);
+        _selectedObject = items.LastOrDefault();
+        _objectPreview = _selectionBounds;
+        _objectDrag = null;
+    }
+    private bool BeginObjectInteraction(PdfPoint point, bool toggleSelection = false)
+    {
+        int? load = null; bool handled = false;
         lock (_gate)
         {
             if (_disposed || _snapshot is null) return false;
@@ -96,20 +124,40 @@ public sealed partial class PdfViewportController
             else
             {
                 var local = hit.Value.Point; var corner = -1;
-                if (_selectedObject is { CanEdit: true } old && old.Reference.PageNumber == hit.Value.PageNumber)
+                if (!toggleSelection && _selectionBounds is { } selectedBounds && _selectedObjects.All(o => o.CanEdit))
                 {
-                    var corners = ObjectCorners(old.Bounds); var radius = 7 / _layout!.Scale;
-                    for (var i = 0; i < corners.Length; i++) if (Math.Abs(corners[i].X - local.X) <= radius && Math.Abs(corners[i].Y - local.Y) <= radius) { corner = i; break; }
+                    var corners = ObjectCorners(selectedBounds); var radius = 7 / _layout!.Scale;
+                    for (var i = 0; i < corners.Length; i++)
+                        if (Math.Abs(corners[i].X - local.X) <= radius && Math.Abs(corners[i].Y - local.Y) <= radius) { corner = i; break; }
                 }
-                if (corner < 0) _selectedObject = _contentPage.Objects.LastOrDefault(item => item.Bounds.Contains(local));
-                _objectPreview = _selectedObject?.Bounds;
-                if (_selectedObject is { CanEdit: true } item && item.Bounds.Width > .001 && item.Bounds.Height > .001)
-                { _objectDrag = new(item, local, corner); selected = true; }
-                else _objectDrag = null;
+                var target = _contentPage.Objects.LastOrDefault(item => item.Bounds.Contains(local));
+                if (toggleSelection)
+                {
+                    if (target is not null)
+                    {
+                        var items = _selectedObjects.ToList();
+                        if (!items.Remove(target))
+                        {
+                            if (items.Count >= EditContentObjects.MaximumSelection) { _contentError = "The selection exceeds 1000 objects."; return false; }
+                            items.Add(target);
+                        }
+                        SetSelectedObjectsLocked(items.ToArray());
+                    }
+                    handled = true; // Toggle only; never start a drag on the same press.
+                }
+                else
+                {
+                    if (corner < 0 && (target is null || !_selectedObjects.Contains(target)))
+                        SetSelectedObjectsLocked(target is null ? [] : [target]);
+                    _objectPreview = _selectionBounds;
+                    if (_selectionBounds is { Width: > .001, Height: > .001 } bounds && _selectedObjects.All(o => o.CanEdit))
+                    { _objectDrag = new(_selectedObjects, bounds, local, corner); handled = true; }
+                    else _objectDrag = null;
+                }
             }
         }
         if (load.HasValue) _ = LoadContentAsync(load);
-        Notify(); return selected;
+        Notify(); return handled;
     }
     private static PdfPoint[] ObjectCorners(PdfRect bounds) => [new(bounds.X, bounds.Y), new(bounds.Right, bounds.Y), new(bounds.Right, bounds.Bottom), new(bounds.X, bounds.Bottom)];
     private bool MoveObjectInteraction(PdfPoint point)
@@ -119,7 +167,7 @@ public sealed partial class PdfViewportController
             if (_disposed || _objectDrag is not { } drag || drag.Object.Reference.Revision != _snapshot?.Id) return false;
             if (!_placements.TryGetValue(drag.Object.Reference.PageNumber, out var placement)) return false;
             var local = new PdfPoint((point.X + _offset.X - placement.Bounds.X) / _layout!.Scale, (point.Y + _offset.Y - placement.Bounds.Y) / _layout.Scale);
-            var b = drag.Object.Bounds;
+            var b = drag.Bounds;
             if (drag.Corner < 0) _objectPreview = new PdfRect(b.X + local.X - drag.Start.X, b.Y + local.Y - drag.Start.Y, b.Width, b.Height);
             else
             {
@@ -141,11 +189,11 @@ public sealed partial class PdfViewportController
         }
         if (drag is null) return false;
         if (bounds is not { } target || drag.Object.Reference.Revision != Document?.Id) return true;
-        var source = drag.Object.Bounds;
+        var source = drag.Bounds;
         if (Math.Abs(source.X - target.X) + Math.Abs(source.Y - target.Y) + Math.Abs(source.Width - target.Width) + Math.Abs(source.Height - target.Height) < .01) return true;
         try
         {
-            await Session.ApplyAsync(new TransformContentObject(drag.Object.Reference, BoundsTransform(source, target)), drag.Object.Reference.Revision, cancellationToken).ConfigureAwait(false);
+            await Session.ApplyAsync(PdfContentSelection.Transform(drag.Objects, BoundsTransform(source, target)), drag.Object.Reference.Revision, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
