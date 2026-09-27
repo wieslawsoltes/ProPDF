@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)../licenses/Uno/*.txt" Link="licenses/Uno/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

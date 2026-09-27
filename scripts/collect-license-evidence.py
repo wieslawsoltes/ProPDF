@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Collect textual evidence for *all* resolved licenses before the fail-closed gate.
-
-This is diagnostics only: it never approves a dependency or replaces audit-licenses.py.
-No assemblies, fonts, credentials or user documents are copied.
-"""
+"""Collect textual license evidence, without approving or suppressing failures."""
 from __future__ import annotations
 import hashlib
 import importlib.util
 import json
 import pathlib
 import shutil
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -61,7 +59,9 @@ def main():
                 record['evidence'].append({'path': str(destination.relative_to(OUTPUT)), 'sha256': hashlib.sha256(raw).hexdigest()})
             records[key] = record
     (OUTPUT / 'inventory.json').write_text(json.dumps(list(records.values()), indent=2) + '\n', encoding='utf-8')
-    print(f'Collected license evidence for {len(records)} packages; the separate strict audit still decides success.')
+    # Preparation is not license approval. audit-licenses.py remains a mandatory separate gate.
+    subprocess.run([sys.executable, str(ROOT / 'scripts/fetch-uno-notices.py')], check=True)
+    print(f'Collected evidence for {len(records)} packages; the strict audit still decides success.')
 
 
 if __name__ == '__main__':

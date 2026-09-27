@@ -11,9 +11,11 @@ internal static partial class PlatformHost
     private static bool _initialized;
     public static async Task InitializeAsync()
     {
-        using var document = JSHost.GlobalThis.GetPropertyAsJSObject("document");
+        using var document = JSHost.GlobalThis.GetPropertyAsJSObject("document")
+            ?? throw new InvalidOperationException("The browser document is unavailable.");
         var baseUri = document.GetPropertyAsString("baseURI") ?? throw new InvalidOperationException("Browser document has no base URI.");
-        await JSHost.ImportAsync("ProPDFBrowser", new Uri(new Uri(baseUri), "browser-host.js").AbsoluteUri); _initialized = true;
+        await JSHost.ImportAsync("ProPDFBrowser", new Uri(new Uri(baseUri), "browser-host.js").AbsoluteUri);
+        _initialized = true;
     }
     [JSImport("pickFile", "ProPDFBrowser")]
     internal static partial Task<string?> PickAsync(string accept, int maximumBytes);

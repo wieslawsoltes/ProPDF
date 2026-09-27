@@ -5,8 +5,7 @@
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
     <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
-    <!-- Opt in only to the PDF host dependencies. Do not restore HotDesign/MCP,
-         the legacy logging service locator, or X11's LGPL video-player dependency. -->
+    <!-- No implicit service locator, commercial tooling, X11 video or Win32 SDK metadata. -->
     <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
     <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
@@ -18,11 +17,15 @@
     <ApplicationPublisher>ProPDF</ApplicationPublisher>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishTrimmed>false</PublishTrimmed>
     <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>
     <WasmShellWebAppBasePath>/ProPDF/</WasmShellWebAppBasePath>
     <WasmShellGenerateCompressedFiles>false</WasmShellGenerateCompressedFiles>
   </PropertyGroup>
-  <PropertyGroup Condition="$(TargetFramework.Contains('browserwasm'))"><DefineConstants>$(DefineConstants);BROWSER_WASM</DefineConstants></PropertyGroup>
+  <PropertyGroup Condition="$(TargetFramework.Contains('browserwasm'))">
+    <DefineConstants>$(DefineConstants);BROWSER_WASM</DefineConstants>
+    <GenerateSupportedOSPlatformAttribute>false</GenerateSupportedOSPlatformAttribute>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/ProPDF.Uno/ProPDF.Uno.csproj" />
     <ProjectReference Include="../ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
@@ -30,6 +33,7 @@
     <PackageReference Include="Uno.WinUI.Graphics2DSK" Version="6.7.135" />
     <PackageReference Include="Uno.Fonts.OpenSans" Version="2.9.4" />
     <Content Include="browser-host.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../artifacts/upstream-notices/*.txt" Link="licenses/Uno/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.Contains('browserwasm'))">
     <PackageReference Include="Uno.Wasm.Bootstrap" Version="10.0.98" />
@@ -38,7 +42,9 @@
     <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" Version="3.119.4" />
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.Contains('desktop'))">
-    <PackageReference Include="Uno.WinUI.Runtime.Skia.Win32" Version="6.7.135" />
     <PackageReference Include="Uno.WinUI.Runtime.Skia.MacOS" Version="6.7.135" />
   </ItemGroup>
+  <Target Name="RequireUnoSampleNotices" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../../artifacts/upstream-notices/ICU-77-LICENSE.txt')" Text="Run python scripts/fetch-uno-notices.py before publishing the Uno sample." />
+  </Target>
 </Project>

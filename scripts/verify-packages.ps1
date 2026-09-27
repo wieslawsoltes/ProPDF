@@ -24,6 +24,12 @@ foreach ($package in $packages) {
             if (-not $zip.GetEntry('buildTransitive/ProPDF.Engine.PdfPig.targets')) { throw 'Missing renderer notice propagation.' }
             if ([string]$manifest.package.metadata.license.InnerText -ne 'MIT AND Apache-2.0') { throw 'Incorrect mixed-source adapter license expression.' }
         }
+        if ($id -eq 'ProPDF.Uno') {
+            foreach ($notice in @('Uno-Eventing-LICENSE.txt','Uno-ICU-LICENSE.txt','ICU-77-LICENSE.txt')) {
+                if (-not $zip.GetEntry("licenses/Uno/$notice")) { throw "Missing Uno runtime notice: $notice" }
+            }
+            if (-not $zip.GetEntry('buildTransitive/ProPDF.Uno.targets')) { throw 'Missing Uno notice propagation.' }
+        }
         if (-not $zip.GetEntry('README.md')) { throw "$id has no README." }
         if (@($zip.Entries | Where-Object { $_.FullName -like 'lib/*/*.dll' }).Count -eq 0) { throw "$id has no assembly." }
         if (@($zip.Entries | Where-Object { $_.FullName -like 'lib/*/*.xml' }).Count -eq 0) { throw "$id has no XML documentation." }
@@ -48,7 +54,7 @@ function New-Consumer([string]$Name,[string]$Framework,[string[]]$References,[st
     $output = if ($Executable) { 'Exe' } else { 'Library' }
     $useWpf = if ($Wpf) { '<UseWPF>true</UseWPF>' } else { '' }
     $sdk = if ($Uno) { 'Uno.Sdk/6.7.30' } else { 'Microsoft.NET.Sdk' }
-    $unoProperties = if ($Uno) { '<UnoFeatures>Skia;SkiaRenderer</UnoFeatures><SkiaSharpVersion>3.119.4</SkiaSharpVersion><GenerateLibraryLayout>true</GenerateLibraryLayout>' } else { '' }
+    $unoProperties = if ($Uno) { '<UnoFeatures>Skia;SkiaRenderer</UnoFeatures><DisableImplicitUnoPackages>true</DisableImplicitUnoPackages><SkiaSharpVersion>3.119.4</SkiaSharpVersion><GenerateLibraryLayout>true</GenerateLibraryLayout>' } else { '' }
     @"
 <Project Sdk="$sdk">
 <PropertyGroup><TargetFramework>$Framework</TargetFramework><OutputType>$output</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><EnableWindowsTargeting>true</EnableWindowsTargeting><ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally><UseSharedCompilation>false</UseSharedCompilation>$useWpf $unoProperties</PropertyGroup>
@@ -91,20 +97,19 @@ Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rende
     $wpf = New-Consumer -Name WpfConsumer -Framework net8.0-windows -References @('ProPDF.Wpf') -Wpf $true -Code 'public static class Consumer { public static ProPDF.Wpf.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     $uno = New-Consumer -Name UnoConsumer -Framework net10.0 -References @('ProPDF.Uno') -Uno $true -Code 'public static class Consumer { public static ProPDF.Uno.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; public static ProPDF.Uno.PdfView CreateView() => new(); }'
     foreach ($project in @($engine,$avalonia,$wpf,$uno)) {
-        Invoke-DotNet -Arguments @('restore',$project,'--disable-build-servers','--configfile',(Join-Path $work 'NuGet.Config'))
+        Invoke-DotNet -Arguments @('restore',$project,'-p:Configuration=Release','--disable-build-servers','--configfile',(Join-Path $work 'NuGet.Config'))
         Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore','--disable-build-servers','-p:UseSharedCompilation=false')
     }
     Invoke-DotNet -Arguments @('run','--project',$engine,'-c','Release','--no-build')
     if (@(Get-ChildItem (Join-Path $work 'EngineConsumer/bin') -Recurse -Filter NOTICE.txt | Where-Object { $_.DirectoryName -match 'PdfPig.Skia' }).Count -eq 0) { throw 'Packaged renderer notices were not copied to consumer output.' }
+    if (@(Get-ChildItem (Join-Path $work 'UnoConsumer/bin') -Recurse -Filter ICU-77-LICENSE.txt).Count -eq 0) { throw 'Packaged Uno runtime notices were not copied to consumer output.' }
     Write-Host "PASS: all nine standalone packages at $version."
 } finally {
     $env:MSBUILDDISABLENODEREUSE = $previousNodeReuse
-    # Antivirus or third-party build services may briefly retain the temporary directory on Windows.
-    # Cleanup must not replace an earlier validation exception or report a passing consumer as failed.
     for ($attempt = 0; $attempt -lt 5 -and (Test-Path $work); $attempt++) {
         try { Remove-Item $work -Recurse -Force -ErrorAction Stop }
         catch {
-            if ($attempt -eq 4) { Write-Warning "Temporary consumer directory remains locked: $work. All validation failures remain fatal; only cleanup is best-effort." }
+            if ($attempt -eq 4) { Write-Warning "Temporary consumer directory remains locked: $work. Validation failures remain fatal; only cleanup is best-effort." }
             else { Start-Sleep -Milliseconds (200 * ($attempt + 1)) }
         }
     }

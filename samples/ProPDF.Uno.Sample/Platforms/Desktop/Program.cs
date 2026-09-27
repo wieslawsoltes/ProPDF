@@ -5,8 +5,8 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS())
-            throw new PlatformNotSupportedException("The permissive-only Uno desktop sample currently supports Windows and macOS. On Linux use the Uno browser sample or the Avalonia desktop editor; Uno's stock X11 host brings an LGPL video dependency and is intentionally not included.");
-        UnoPlatformHostBuilder.Create().App(() => new App()).UseMacOS().UseWin32().Build().Run();
+        if (!OperatingSystem.IsMacOS())
+            throw new PlatformNotSupportedException("This permissive-only native Uno sample currently uses the macOS host. Use the Uno browser app on Windows/Linux, or the existing WPF/Avalonia native editors. Stock Uno Win32/X11 packages introduce non-permissive SDK metadata/video dependencies and are not included.");
+        UnoPlatformHostBuilder.Create().App(() => new App()).UseMacOS().Build().Run();
     }
 }

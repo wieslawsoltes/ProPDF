@@ -11,6 +11,24 @@
       "license_file_sha256": "54aff7276217df9f6b5181613999d208c9e40d2b1d51bf55217837e6871a4a63",
       "source": "https://chromium.googlesource.com/angle/angle/+/main/LICENSE",
       "note": "Exact package version and bundled LICENSE text reviewed as the ANGLE three-clause BSD license. Preserve native third-party notices when distributing applications."
+    },
+    "uno.diagnostics.eventing/2.0.1": {
+      "license": "Apache-2.0",
+      "manifest_sha256": "10a000ce9aed5b5740be94858f5356f1ac4b03261f685241db771637cd1b98d4",
+      "source": "https://github.com/unoplatform/Uno.Diagnostics.Eventing/blob/main/License.md",
+      "note": "Legacy manifest omits its Apache-2.0 declaration. Exact manifest and upstream license blob b48e38bd66fc14eb89ad5d050c688f721c1aa6f0 reviewed; fetch-uno-notices.py retains the full pinned text. This does not enable analytics or network telemetry."
+    },
+    "uno.icu-wasm/77.3.2": {
+      "license": "Apache-2.0 AND Unicode-3.0",
+      "manifest_sha256": "e9bd47f983ce6b3a614022330f63e59c0380cfbcc25ccf9982020ae30fb15484",
+      "source": "https://github.com/unoplatform/uno.icu/blob/main/LICENSE.md",
+      "note": "Uno build wrapper is Apache-2.0; ICU 77 runtime uses Unicode License V3 and retained third-party notices. Exact package manifest is pinned. Full ICU LICENSE blob 0b9efcd9092f977797c2572de717ca2edac50bc2 and wrapper text are retained. This does not approve unrelated GPL build scripts or any restricted package."
+    },
+    "uno.icu-macos/77.3.2": {
+      "license": "Apache-2.0 AND Unicode-3.0",
+      "manifest_sha256": "6dd82fcdd1b24a7eda61cc2bd3100601e9f6bfd679cea3d5e3a5a51aa916794c",
+      "source": "https://github.com/unoplatform/uno.icu/blob/main/LICENSE.md",
+      "note": "Exact macOS counterpart of the reviewed ICU 77 runtime; retain Apache-2.0 wrapper and complete Unicode License V3/third-party notices through fetch-uno-notices.py. No Win32 SDK metadata or media-player license exception is granted."
     }
   }
 }
