@@ -1,0 +1,26 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="ProPDF.Wpf.PdfContentPanel" >
+<ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12,8">
+  <TextBlock Text="EXISTING PAGE CONTENT" FontSize="11" FontWeight="SemiBold" Margin="0,8,0,6"/>
+  <WrapPanel><Button Content="Select / drag" Command="{Binding EditObjectsCommand}"/><Button Content="Refresh" Command="{Binding RefreshObjectsCommand}"/></WrapPanel>
+  <TextBlock Text="{Binding ContentStatus}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,6"/>
+  <ListBox Height="150" ItemsSource="{Binding ContentObjects}" SelectedItem="{Binding SelectedContentObject, Mode=TwoWay}"/>
+  <TextBlock Text="POSITION AND SIZE · PDF POINTS" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
+  <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <TextBlock Grid.Row="0" Grid.Column="0" Text="X" VerticalAlignment="Center"/><TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ContentX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+    <TextBlock Grid.Row="0" Grid.Column="2" Text="Y" VerticalAlignment="Center"/><TextBox Grid.Row="0" Grid.Column="3" Text="{Binding ContentY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+    <TextBlock Grid.Row="1" Grid.Column="0" Text="W" VerticalAlignment="Center"/><TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ContentWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+    <TextBlock Grid.Row="1" Grid.Column="2" Text="H" VerticalAlignment="Center"/><TextBox Grid.Row="1" Grid.Column="3" Text="{Binding ContentHeight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="2"/>
+  </Grid>
+  <Button x:Name="ApplyObjectBoundsButton" Content="Apply position / size" Command="{Binding ApplyObjectBoundsCommand}"/>
+  <WrapPanel><Button Content="Rotate 90°" Command="{Binding RotateObjectCommand}"/><Button Content="Flip" Command="{Binding FlipObjectCommand}"/></WrapPanel>
+  <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicateObjectCommand}"/><Button Content="Delete" Command="{Binding DeleteObjectCommand}"/></WrapPanel>
+  <TextBlock Text="REPLACE TEXT OBJECT" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
+  <TextBox Text="{Binding ContentText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="78"/>
+  <TextBlock Text="Font size" Margin="0,6,0,2"/><TextBox Text="{Binding ContentFontSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+  <ComboBox ItemsSource="{Binding TextAlignments}" SelectedItem="{Binding TextAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,5"/>
+  <Button Content="Replace selected text" Command="{Binding ReplaceObjectTextCommand}"/>
+  <TextBlock Text="Replacement wraps in the size above. Overflow is rejected. Other objects are preserved." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
+  <Button Content="Clip to selected region" Command="{Binding ClipObjectCommand}"/>
+  <TextBlock Text="Select an object, then use Select region. Clipping only hides content; it is not redaction." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
+</StackPanel></ScrollViewer>
+</UserControl>

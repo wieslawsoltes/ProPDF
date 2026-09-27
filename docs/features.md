@@ -16,7 +16,9 @@ Implemented means executable code and regression coverage exist, not qualificati
 | Raster output | PNG/JPEG/WebP page/region | PNG/JPEG current page with DPI | Bounded assembled raster; not vector export |
 | UTF-8 export | Streaming selected pages | Implemented | Extraction order; not OCR/layout reconstruction |
 | Document comparison | Page-aligned visual/text difference | Compare/list/navigate/JSON report | No automatic alignment, semantic or metadata equivalence |
-| Text/image/vector insertion | Implemented | Implemented | No general existing-object editor |
+| Text/image/vector insertion | Implemented | Implemented | Native insertion; no complex-script shaping |
+| Existing page content | Inspect, affine transform, duplicate, delete and clip | Object list, click/drag, corner resize and inspector commands | Whole text/path groups or XObject invocations; approximate bounds; conservative exclusions |
+| Wrapped text and object replacement | AddTextBox and ReplaceContentText | Wrapped box tool and selected-text replacement | Overflow rejected; replaces whole text group; no adjacent-object paragraph reflow |
 | Region replacement | Implemented | Implemented | Removes all regional content; no paragraph reflow |
 | Notes/free-text/highlight/underline/strikeout | Implemented | First three tools | Underline/strikeout API-only |
 | Shape/link/ink annotations | Implemented | Shapes/ink/internal links | Axis-aligned ink supported; no page-click link activation yet |
@@ -36,7 +38,7 @@ Implemented means executable code and regression coverage exist, not qualificati
 
 ## Major remaining Acrobat-level work
 
-General existing-object editing and paragraph reflow; advanced typography and complex-script shaping; semantic/cross-page selection; complete forms/calculation/signature UI; XFA; OCR/scanning; Office/HTML conversion; printing and production-print support; semantic comparison and automatic page alignment; portfolios; optional-content layer editing; complete page-click links and outline drag/drop; tagged-PDF authoring/reading order; PDF/A/PDF/UA conformance; preflight, overprint, separations and ICC; multimedia/3D; certificate trust/revocation/timestamps/PAdES-LTV; secure enterprise collaboration; hostile-input process isolation; certified sanitization; physical-machine performance qualification.
+Recursive/general content editing beyond supported paint groups, rich paragraph editing and adjacent-object reflow; advanced typography and complex-script shaping; semantic/cross-page selection; complete forms/calculation/signature UI; XFA; OCR/scanning; Office/HTML conversion; printing and production-print support; semantic comparison and automatic page alignment; portfolios; optional-content layer editing; complete page-click links and outline drag/drop; tagged-PDF authoring/reading order; PDF/A/PDF/UA conformance; preflight, overprint, separations and ICC; multimedia/3D; certificate trust/revocation/timestamps/PAdES-LTV; secure enterprise collaboration; hostile-input process isolation; certified sanitization; physical-machine performance qualification.
 
 ## Validation and qualification
 
@@ -44,7 +46,7 @@ The CI matrix builds all projects, tests independently reopened PDFs, raster pix
 
 Add licensed representative files covering embedded/Type3/CID fonts, CMaps, bidirectional scripts, masks, transparency, codecs, damaged cross-reference streams, tags, optional content, signatures and incremental histories. Compare in independent viewers and qualify accessibility/performance on physical machines. Each new feature must state its interoperability and security boundaries.
 
-[Output and comparison](output-comparison.md) · [Navigation and bookmarks](navigation.md)
+[Existing content and wrapped text](content-editing.md) · [Output and comparison](output-comparison.md) · [Navigation and bookmarks](navigation.md)
 
 ## Owned backend qualifications
 

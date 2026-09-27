@@ -125,3 +125,9 @@ CI validates Windows, Linux and macOS, native UI smoke rendering and clean exter
 Publication requires configured GitHub Pages, NuGet ownership/credentials and a protected release environment. Releases revalidate immutable reviewed tags and include source, package/symbol files, sample archives and checksums. See [Deployment prerequisites](docs/deployment-setup.md).
 
 ProPDF source is MIT. Preserve the licenses and native notices of the permissive dependencies when distributing applications. [Third-party notices](THIRD-PARTY-NOTICES.md) · [Migration guide](docs/dependency-compatibility.md) · [Changelog](CHANGELOG.md)
+
+## Existing page content
+
+The owned editor now inspects text groups, painted paths, image invocations and form invocations. Both native editors provide an **Edit** inspector with selection, dragging, corner resizing, numeric transforms, duplication, deletion, visual clipping and wrapped text replacement. Persistent graphics/text state is preserved so subsequent objects are not accidentally restyled. Revision/fingerprint handles reject stale edits; text overflow rejects the transaction instead of silently dropping lines.
+
+Tile rendering uses device-space origin alignment and a small gutter. Display-list caching now has an approximate byte limit in addition to its entry limit. These changes do not imply full GPU PDF interpretation, pixel-identical vector antialiasing or an unmeasured speedup. See [Existing content and text boxes](docs/content-editing.md) for supported units, bounds, font/layout limits and the distinction between visual clipping and actual redaction.

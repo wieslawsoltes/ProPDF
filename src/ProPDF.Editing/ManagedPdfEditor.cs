@@ -34,6 +34,7 @@ public sealed partial class ManagedPdfEditor : IPdfEditor, IPdfDocumentInspector
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(operations);
         var batch = operations.ToArray(); if (batch.Length == 0) return source;
         if (batch.Any(operation => operation is null || !Capabilities.Contains(operation.Capability))) throw new NotSupportedException("Unsupported edit capability.");
+        if (batch.OfType<PdfContentObjectEdit>().Any(edit => edit.Object is null || edit.Object.Revision != source.Id)) throw new PdfRevisionConflictException();
         var changes = batch.OfType<ChangeEncryption>().ToArray(); if (changes.Length > 1) throw new ArgumentException("Only one encryption change is allowed per transaction.");
         var password = changes.Length == 0 ? source.GetPassword() : changes[0].Settings?.GetOwnerPassword();
         var bytes = await Task.Run(() =>
@@ -96,6 +97,8 @@ public sealed partial class ManagedPdfEditor : IPdfEditor, IPdfDocumentInspector
                 var cropped = graph.Page(crop.PageNumber); cropped.Validate(crop.ViewBounds); var box = cropped.Transform.ToPdf(crop.ViewBounds);
                 cropped.Dictionary["CropBox"] = Numbers(box.X, box.Y, box.Right, box.Bottom); break;
             case InsertDocumentPages insert: graph.InsertPages(Open(insert.Document, token), insert.Pages, insert.BeforePage); break;
+            case PdfContentObjectEdit edit: EditContentObject(graph, edit, token); break;
+            case AddTextBox textBox: graph.Append(graph.Page(textBox.PageNumber), CreateTextBox(graph, textBox, token)); break;
             case AddText text: InsertText(graph, text); break;
             case AddImage image: InsertImage(graph, image); break;
             case AddShape shape: InsertShape(graph, shape); break;

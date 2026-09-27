@@ -17,11 +17,12 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
     private readonly LinkedList<Guid> _documentLru = [];
     private bool _disposed;
     private long _bytes;
+    private long _pictureBytes;
     private long _hits;
     private long _misses;
 
     private sealed record TileEntry(SharedSkiaImage Image, LinkedListNode<(Guid, SkiaTileRequest)> Node);
-    private sealed record PictureEntry(SKPicture Picture, LinkedListNode<(Guid, int)> Node);
+    private sealed record PictureEntry(SKPicture Picture, LinkedListNode<(Guid, int)> Node, long Bytes);
     private sealed record DocumentEntry(ISkiaPdfDocument Document, LinkedListNode<Guid> Node);
 
     public SkiaPdfRenderer(ISkiaPdfDocumentFactory factory, SkiaRendererOptions? options = null)
@@ -29,7 +30,7 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         _options = options ?? new SkiaRendererOptions();
         if (_options.MaximumTileCacheBytes < 0 || _options.MaximumDisplayLists < 1 ||
-            _options.MaximumOpenDocuments < 1 || _options.MaximumTileEdge is < 16 or > 8192)
+            _options.MaximumOpenDocuments < 1 || _options.MaximumDisplayListBytes < 0 || _options.MaximumTileEdge is < 16 or > 8192)
             throw new ArgumentOutOfRangeException(nameof(options));
     }
 
@@ -76,24 +77,38 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
 
     private SKImage Rasterize(PdfSnapshot snapshot, SkiaTileRequest request, CancellationToken cancellationToken)
     {
-        var picture = GetPicture(snapshot, request.PageNumber, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        var width = checked((int)Math.Ceiling(request.Clip.Width * request.PixelsPerPoint));
-        var height = checked((int)Math.Ceiling(request.Clip.Height * request.PixelsPerPoint));
-        using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul))
-            ?? throw new InvalidOperationException("Skia could not allocate a tile surface.");
-        var canvas = surface.Canvas;
-        canvas.Clear(SKColors.White);
-        canvas.Scale((float)request.PixelsPerPoint);
-        canvas.Translate((float)-request.Clip.X, (float)-request.Clip.Y);
-        canvas.ClipRect(new SKRect((float)request.Clip.X, (float)request.Clip.Y, (float)request.Clip.Right, (float)request.Clip.Bottom));
-        canvas.DrawPicture(picture);
-        cancellationToken.ThrowIfCancellationRequested();
-        return surface.Snapshot();
+        var picture = GetPicture(snapshot, request.PageNumber, cancellationToken, out var transient);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var width = request.PixelWidth;
+            var height = request.PixelHeight;
+            // A small device-space gutter prevents tile-edge clipping from truncating antialiasing/filter support.
+            const int gutter = 2;
+            using var surface = SKSurface.Create(new SKImageInfo(width + 2 * gutter, height + 2 * gutter, SKColorType.Bgra8888, SKAlphaType.Premul))
+                ?? throw new InvalidOperationException("Skia could not allocate a tile surface.");
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.White);
+            var scale = (float)request.PixelsPerPoint;
+            // Multiply in double precision before converting to Skia's floats. Scale then Translate would
+            // round each tile's PDF-point origin separately, changing the page-wide image sampling phase.
+            var originX = request.Clip.X * request.PixelsPerPoint;
+            var originY = request.Clip.Y * request.PixelsPerPoint;
+            if (Math.Abs(originX - Math.Round(originX)) < 1e-7) originX = Math.Round(originX);
+            if (Math.Abs(originY - Math.Round(originY)) < 1e-7) originY = Math.Round(originY);
+            canvas.SetMatrix(new SKMatrix(scale, 0, (float)(gutter - originX), 0, scale, (float)(gutter - originY), 0, 0, 1));
+            var page = snapshot.GetPage(request.PageNumber);
+            canvas.ClipRect(new SKRect(0, 0, (float)page.Size.Width, (float)page.Size.Height));
+            canvas.DrawPicture(picture);
+            cancellationToken.ThrowIfCancellationRequested();
+            return surface.Snapshot(new SKRectI(gutter, gutter, gutter + width, gutter + height));
+        }
+        finally { if (transient) picture.Dispose(); }
     }
 
-    private SKPicture GetPicture(PdfSnapshot snapshot, int pageNumber, CancellationToken cancellationToken)
+    private SKPicture GetPicture(PdfSnapshot snapshot, int pageNumber, CancellationToken cancellationToken, out bool transient)
     {
+        transient = false;
         var key = (snapshot.Id, pageNumber);
         if (_pictures.TryGetValue(key, out var cached))
         {
@@ -105,13 +120,21 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
         var picture = document.RecordPage(pageNumber, cancellationToken);
         try { cancellationToken.ThrowIfCancellationRequested(); }
         catch { picture.Dispose(); throw; }
-        _pictures.Add(key, new PictureEntry(picture, _pictureLru.AddLast(key)));
-        while (_pictures.Count > _options.MaximumDisplayLists)
+        var bytes = Math.Max(0, picture.ApproximateBytesUsed);
+        if (bytes > _options.MaximumDisplayListBytes || _options.MaximumDisplayListBytes == 0)
+        {
+            transient = true;
+            return picture; // Oversized pictures are used once and disposed after rasterization.
+        }
+        _pictures.Add(key, new PictureEntry(picture, _pictureLru.AddLast(key), bytes));
+        _pictureBytes += bytes;
+        while (_pictures.Count > _options.MaximumDisplayLists || _pictureBytes > _options.MaximumDisplayListBytes)
         {
             var oldest = _pictureLru.First!;
             _pictureLru.RemoveFirst();
             _pictures.Remove(oldest.Value, out var removed);
-            removed!.Picture.Dispose();
+            _pictureBytes -= removed!.Bytes;
+            removed.Picture.Dispose();
         }
         return picture;
     }
@@ -150,7 +173,7 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
     public async Task<SkiaRendererStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default)
     {
         await _worker.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { return new SkiaRendererStatistics(_hits, _misses, _bytes, _tiles.Count, _pictures.Count, _documents.Count); }
+        try { return new SkiaRendererStatistics(_hits, _misses, _bytes, _tiles.Count, _pictures.Count, _documents.Count, _pictureBytes); }
         finally { _worker.Release(); }
     }
 
@@ -171,6 +194,7 @@ public sealed class SkiaPdfRenderer : IAsyncDisposable
             _pictureLru.Clear();
             _documentLru.Clear();
             _bytes = 0;
+            _pictureBytes = 0;
         }
         finally { _worker.Release(); }
         // Do not dispose the semaphore: already queued callers must wake and observe ObjectDisposedException.

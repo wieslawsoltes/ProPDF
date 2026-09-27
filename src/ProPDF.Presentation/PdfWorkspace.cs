@@ -340,6 +340,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
             Bookmarks = Array.Empty<PdfBookmarkInfo>();
             if (document is not null && _context.Inspector is not null) _ = LoadInspectionAsync(document, _lifetime.Token);
         }
+        RefreshContentState();
         var page = Math.Clamp(Viewport.CurrentPage, 1, Math.Max(1, document?.Pages.Count ?? 1));
         _selectedPage = document?.GetPage(page);
         // Progressive tile updates must not overwrite a page number the user is currently typing.
@@ -375,6 +376,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     private bool Available(PdfTool tool) => tool switch
     {
         PdfTool.Pan or PdfTool.SelectRegion or PdfTool.SelectText => true,
+        PdfTool.EditObject => _context.Inspector is IPdfContentService,
         PdfTool.Highlight or PdfTool.Note or PdfTool.FreeText or PdfTool.Ink => Session.Capabilities.Contains(PdfCapability.Annotations),
         PdfTool.Redact => Session.Capabilities.Contains(PdfCapability.Redaction),
         PdfTool.ReplaceText => Session.Capabilities.Contains(PdfCapability.ContentReplacement),
@@ -383,6 +385,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     };
     private static readonly PdfToolDescriptor[] AllTools =
     [
+        new(PdfTool.EditObject, "Edit existing objects"), new(PdfTool.TextBox, "Wrapped text box"),
         new(PdfTool.Pan, "Hand / pan"), new(PdfTool.SelectText, "Select text"), new(PdfTool.SelectRegion, "Select region"),
         new(PdfTool.Highlight, "Highlight"), new(PdfTool.Note, "Sticky note"), new(PdfTool.FreeText, "Text comment"),
         new(PdfTool.Text, "Insert text"), new(PdfTool.Rectangle, "Rectangle"), new(PdfTool.Ellipse, "Ellipse"),

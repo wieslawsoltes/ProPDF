@@ -9,6 +9,7 @@ using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ProPDF.SampleSupport;
+using ProPDF.Core;
 using SkiaSharp;
 
 namespace ProPDF.Avalonia.Smoke;
@@ -50,6 +51,22 @@ internal static class Program
             if (!ReferenceEquals(followButton.Command, workspace.FollowBookmarkCommand)) throw new InvalidOperationException("Native bookmark command binding is missing.");
             var exportButton = editor.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ExportPngButton");
             if (!ReferenceEquals(exportButton.Command, workspace.ExportPngCommand)) throw new InvalidOperationException("Native image export command binding is missing.");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfContentPanel);
+            Pump(workspace.EditObjectsCommand.ExecuteAsync());
+            PumpUntil(() => editor.GetVisualDescendants().OfType<PdfContentPanel>().Any());
+            var editButton = editor.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ApplyObjectBoundsButton");
+            if (!ReferenceEquals(editButton.Command, workspace.ApplyObjectBoundsCommand)) throw new InvalidOperationException("Native object-edit command binding is missing.");
+            var originalObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            workspace.SelectedContentObject = originalObject;
+            workspace.ContentX = (originalObject.Bounds.X + 12).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Pump(workspace.ApplyObjectBoundsCommand.ExecuteAsync());
+            var inspection = runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1);
+            Pump(inspection);
+            var movedObject = inspection.Result.Objects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            if (Math.Abs(movedObject.Bounds.X - originalObject.Bounds.X - 12) > .01) throw new InvalidOperationException("Bound content-edit command did not move native PDF text.");
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("The search command found no sample text.");
@@ -83,7 +100,7 @@ internal static class Program
             window.Content = null;
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());
-            Console.WriteLine($"PASS: Avalonia real-Skia editor, native output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
+            Console.WriteLine($"PASS: Avalonia real-Skia editor, native content-edit/output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

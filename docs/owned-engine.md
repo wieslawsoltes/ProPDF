@@ -43,3 +43,7 @@ These are focused regression and interoperability checks, not complete ISO 32000
 Primary design references: [PDF Association specification errata](https://pdf-issues.pdfa.org/32000-2-2020/), [OpenType cmap](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap), [OpenType embedding permissions](https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fstype), [.NET SignedCms](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.pkcs.signedcms).
 
 The kernel recognizes PDF 2.0 syntax. The pinned optional PdfPig rendering adapter has a strict-header limitation for PDF 2.0 files; full PDF 2.0 rendering is not claimed. New AES-256 output therefore declares its extension level on a PDF 1.7 base header rather than silently relabelling features.
+
+## Existing content editing
+
+`IPdfContentService` and revision-bound content handles support whole text/path groups and image/form invocations. The owned editor preserves persistent state during transforms, duplication, deletion and text replacement. Wrapped text boxes reject overflow. Both frameworks share inspection and manipulation controls. These are constrained native operations, not unrestricted recursive object editing or paragraph reflow. See [Existing content and text boxes](content-editing.md).

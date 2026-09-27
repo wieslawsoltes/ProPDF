@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace ProPDF.Presentation;
 
-public enum PdfOverlayKind { Selection, Search, Redaction }
+public enum PdfOverlayKind { Selection, Search, Redaction, Content }
 public sealed record PdfPageVisual(int PageNumber, PdfRect Bounds);
 public sealed record PdfOverlay(PdfRect Bounds, PdfOverlayKind Kind);
 internal sealed record PdfTileVisual(SkiaTileLease Tile, PdfRect Bounds);
@@ -68,13 +68,21 @@ public sealed class PdfScene : IDisposable
                     _ => new SKColor(55, 110, 235, 58)
                 };
                 paint.Style = SKPaintStyle.Fill;
-                canvas.DrawRect(Rect(overlay.Bounds), paint);
+                if (overlay.Kind != PdfOverlayKind.Content) canvas.DrawRect(Rect(overlay.Bounds), paint);
                 if (overlay.Kind != PdfOverlayKind.Search)
                 {
                     paint.Style = SKPaintStyle.Stroke;
                     paint.StrokeWidth = 1.5f;
                     paint.Color = overlay.Kind == PdfOverlayKind.Redaction ? new SKColor(205, 40, 60) : new SKColor(45, 100, 220);
                     canvas.DrawRect(Rect(overlay.Bounds), paint);
+                    if (overlay.Kind == PdfOverlayKind.Content)
+                    {
+                        foreach (var corner in new[] { new PdfPoint(overlay.Bounds.X, overlay.Bounds.Y), new PdfPoint(overlay.Bounds.Right, overlay.Bounds.Y), new PdfPoint(overlay.Bounds.Right, overlay.Bounds.Bottom), new PdfPoint(overlay.Bounds.X, overlay.Bounds.Bottom) })
+                        {
+                            paint.Style = SKPaintStyle.Fill;
+                            canvas.DrawRect((float)corner.X - 3, (float)corner.Y - 3, 6, 6, paint);
+                        }
+                    }
                 }
             }
             if (_pages.Length == 0)

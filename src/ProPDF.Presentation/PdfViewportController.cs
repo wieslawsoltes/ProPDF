@@ -4,7 +4,7 @@ using ProPDF.Rendering.Skia;
 
 namespace ProPDF.Presentation;
 
-public enum PdfTool { Pan, SelectText, SelectRegion, Highlight, Note, FreeText, Text, Rectangle, Ellipse, Ink, Redact, ReplaceText, TextField, CheckBox }
+public enum PdfTool { Pan, SelectText, SelectRegion, Highlight, Note, FreeText, Text, Rectangle, Ellipse, Ink, Redact, ReplaceText, TextField, CheckBox, EditObject, TextBox }
 public sealed record PdfSelection(Guid Revision, int PageNumber, PdfRect Bounds);
 
 /// <summary>UI-independent, thread-safe viewport and editor interaction model. The host owns the session and renderer.</summary>
@@ -87,6 +87,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             var current = Session.Current;
             if (current?.Id == _snapshot?.Id) return;
             _snapshot = current;
+            ResetContentLocked();
             _currentPage = Math.Clamp(_currentPage, 1, Math.Max(1, current?.Pages.Count ?? 1));
             _selection = null;
             _searchHits = Array.Empty<PdfSearchHit>();
@@ -150,7 +151,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             var hit = HitTestLocked(point);
             var ratio = value / _zoom;
             _zoom = value;
-            _drag = null;
+            _drag = null; _objectDrag = null; _objectPreview = _selectedObject?.Bounds;
             RebuildLayout();
             if (hit is { } target && _placements.TryGetValue(target.PageNumber, out var placement))
                 _offset = new PdfPoint(placement.Bounds.X + target.Point.X * _layout!.Scale - point.X,
@@ -332,6 +333,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
             }
             foreach (var hit in _searchHits)
                 if (map.ContainsKey(hit.PageNumber)) foreach (var bounds in hit.Bounds) Overlay(hit.PageNumber, bounds, PdfOverlayKind.Search);
+            if (_selectedObject is { } selectedObject && _objectPreview is { } preview) Overlay(selectedObject.Reference.PageNumber, preview, PdfOverlayKind.Content);
             if (_selection is { } selection) Overlay(selection.PageNumber, selection.Bounds, PdfOverlayKind.Selection);
             foreach (var redaction in _redactions) Overlay(redaction.PageNumber, redaction.Bounds, PdfOverlayKind.Redaction);
             return new PdfScene(_viewport, pages, tiles.ToArray(), overlays.ToArray());
