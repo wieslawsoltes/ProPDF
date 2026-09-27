@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: feature/uno-platform
-      - name: Apply exact source patch
+      - name: Apply source only; workflow updates use the authorized repository connector
         shell: bash
         run: |
           set -euo pipefail
@@ -30,10 +30,10 @@ jobs:
                   path=pathlib.PurePosixPath(line[6:])
                   assert not path.is_absolute() and '..' not in path.parts and '.git' not in path.parts
           target=pathlib.Path('/tmp/uno.patch'); target.write_bytes(patch)
-          subprocess.run(['git','apply','--check',str(target)],check=True)
-          subprocess.run(['git','apply','--index',str(target)],check=True)
+          subprocess.run(['git','apply','--exclude=.github/workflows/*','--check',str(target)],check=True)
+          subprocess.run(['git','apply','--exclude=.github/workflows/*','--index',str(target)],check=True)
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'feat(uno): reusable controls, full shared editor and browser deployment'
+          git commit -m 'feat(uno): reusable controls and shared browser/desktop editor'
           git push origin HEAD:refs/heads/feature/uno-platform
