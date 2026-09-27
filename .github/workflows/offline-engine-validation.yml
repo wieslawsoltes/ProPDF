@@ -1,0 +1,39 @@
+name: Offline engine validation bundle
+on:
+  push:
+    branches: ['feature/owned-pdf-engine']
+    paths: ['.github/workflows/offline-engine-validation.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.x
+            8.0.x
+      - run: dotnet restore ProPDF.slnx
+      - name: Restore permissive CMS dependency
+        run: |
+          mkdir -p /tmp/cms-check
+          printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.12" /></ItemGroup></Project>' > /tmp/cms-check/check.csproj
+          dotnet restore /tmp/cms-check/check.csproj
+      - name: Prepare offline compiler and non-font dependency cache
+        run: |
+          mkdir -p artifacts/offline
+          sdk=$(dotnet --version)
+          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
+          tar -czf artifacts/offline/dotnet.tar.gz -C "$root" dotnet LICENSE.txt ThirdPartyNotices.txt host shared packs "sdk/$sdk" --exclude='**/templates/**'
+          tar -czf artifacts/offline/packages.tar.gz -C "$HOME/.nuget" --exclude='packages/itext*' --exclude='packages/avalonia.fonts.*' --exclude='*.ttf' --exclude='*.otf' packages
+      - uses: actions/upload-artifact@v7
+        with:
+          name: offline-engine-toolchain
+          path: artifacts/offline/
+          compression-level: 0
+          retention-days: 1
