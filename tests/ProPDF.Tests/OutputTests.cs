@@ -1,6 +1,6 @@
 using System.Text;
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Rendering.Skia;
 using Xunit;
@@ -33,7 +33,7 @@ public sealed class OutputTests
     public async Task RasterExportAssemblesMultipleTilesAndRoundTrips(PdfRasterFormat format)
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(size: new PdfSize(700, 700));
         document = await editor.ApplyAsync(document, new IPdfEditOperation[] { new AddShape(1, new PdfRect(490, 490, 80, 80), Fill: new PdfColor(255, 0, 0)) });
         await using var renderer = new SkiaPdfRenderer(backend);
@@ -55,7 +55,7 @@ public sealed class OutputTests
     public async Task OversizedAndCancelledExportsDoNotPublishFiles()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync();
         await using var renderer = new SkiaPdfRenderer(backend);
         var export = new PdfRasterExporter(renderer);
@@ -80,7 +80,7 @@ public sealed class OutputTests
     public async Task TextExportHonorsOrderAndByteLimitAndLeavesStreamOpen()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(2);
         document = await editor.ApplyAsync(document, new IPdfEditOperation[]
         { new AddText(1, new PdfPoint(20, 40), "First"), new AddText(2, new PdfPoint(20, 40), "Second") });
@@ -97,7 +97,7 @@ public sealed class OutputTests
     public async Task ComparisonDetectsChangedPixelsTextAndAddedPages()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var original = await editor.CreateAsync(size: new PdfSize(200, 300));
         var modified = await editor.ApplyAsync(original, new IPdfEditOperation[]
         { new AddShape(1, new PdfRect(20, 30, 40, 50), Fill: new PdfColor(255, 0, 0)), new AddText(1, new PdfPoint(20, 120), "Changed"), new InsertBlankPage(2, new PdfSize(200, 300)) });
@@ -119,7 +119,7 @@ public sealed class OutputTests
     public async Task MetadataOnlyChangesHaveNoVisualDifferenceAndSizeChangesAreReported()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var original = await editor.CreateAsync(size: new PdfSize(200, 300));
         var metadata = await editor.ApplyAsync(original, new IPdfEditOperation[] { new SetDocumentMetadata(new PdfMetadata("Different title")) });
         await using var renderer = new SkiaPdfRenderer(backend);

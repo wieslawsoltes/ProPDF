@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>ProPDF-owned PDF object model, bounded syntax and cross-reference parser, stream filters, security handler and graph writer. No third-party PDF dependency.</Description>
+  </PropertyGroup>
+</Project>

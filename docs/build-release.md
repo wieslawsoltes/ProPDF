@@ -20,11 +20,14 @@ python -m mkdocs build --strict
 
 ## CI gates
 
+Both build and release validation run `python scripts/audit-licenses.py` after restoring all projects. Unknown or restricted licenses fail; reviewed legacy declarations are exact-version/hash pinned. Negative tests cover rejection and audit completeness. License inventories and package notices accompany validation/release artifacts.
+
+
 Build and test validates the full solution on Linux, Windows and macOS with warnings as errors. Engine tests independently reopen edited PDFs and exercise geometry, redaction text/decoded streams/pixels, forms, encryption/signatures, revisions and native resource lifetime.
 
 Avalonia smoke validation uses real Skia rather than mock headless drawing. WPF uses software rendering on Windows. Both harnesses check native document pixels, command wiring, search, undo and teardown, then upload screenshots. These are regression checks, not physical-GPU, comprehensive visual or accessibility qualification.
 
-Package consumers checks all seven NuGet libraries, symbols, README and XML docs. Clean projects outside the repository restore ProPDF packages from the artifact feed, compile both UI adapters and execute packaged editing/extraction/rendering. Project references cannot hide missing packaged dependencies.
+Package consumers checks all eight NuGet libraries, symbols, README and XML docs. Clean projects outside the repository restore ProPDF packages from the artifact feed, compile both UI adapters and execute packaged editing/extraction/rendering. Project references cannot hide missing packaged dependencies.
 
 Documentation builds Material for MkDocs with strict links/configuration. Workflows upload artifacts, but source configuration alone is not evidence of a successful run. Consult the exact commit's Actions status before merging.
 
@@ -40,7 +43,7 @@ Dry runs do not publish to NuGet or create GitHub releases. GitHub manual dispat
 
 ## Maintainer setup
 
-Create the **nuget-release** environment with required reviewers and protected-tag restrictions. Configure a scoped `NUGET_API_KEY` for the intended package IDs and establish their NuGet ownership. Protect main and release tags. Review iText/pdfSweep licensing before distributing sample applications. No secrets or commercial license entitlements are included in source.
+Create the **nuget-release** environment with required reviewers and protected-tag restrictions. Configure a scoped `NUGET_API_KEY` for the intended package IDs and establish their NuGet ownership. Protect main and release tags. Run the permissive dependency audit and preserve bundled notices before distributing samples. No secrets or commercial PDF license keys are required or included.
 
 After review/merge and successful CI, create an immutable `v<SemVer>` tag on a commit reachable from main. Publishing manual runs also require that exact existing tag to identify the checked-out commit. Invalid versions, mismatched tags and unreviewed branch commits are rejected.
 

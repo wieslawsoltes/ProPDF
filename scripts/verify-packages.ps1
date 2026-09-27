@@ -3,7 +3,7 @@ param([string]$PackageDirectory = 'artifacts/packages')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $feed = (Resolve-Path $PackageDirectory).Path
-$ids = @('ProPDF.Core','ProPDF.Rendering.Skia','ProPDF.Engine.PdfPig','ProPDF.Editing.iText','ProPDF.Presentation','ProPDF.Avalonia','ProPDF.Wpf')
+$ids = @('ProPDF.Kernel','ProPDF.Core','ProPDF.Rendering.Skia','ProPDF.Engine.PdfPig','ProPDF.Editing','ProPDF.Presentation','ProPDF.Avalonia','ProPDF.Wpf')
 $packages = @(Get-ChildItem $feed -Filter '*.nupkg')
 if ($packages.Count -ne $ids.Count) { throw "Expected $($ids.Count) packages; found $($packages.Count)." }
 $versions = @{}
@@ -37,7 +37,7 @@ function New-Consumer([string]$Name,[string]$Framework,[string[]]$References,[st
     $directory = Join-Path $work $Name
     New-Item $directory -ItemType Directory | Out-Null
     $refs = ($References | ForEach-Object { "<PackageReference Include=`"$_`" Version=`"$version`" />" }) -join "`n"
-    $native = if ($Executable) { '<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4"/><PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.3"/><PackageReference Include="itext.pdfsweep" Version="5.0.7" NoWarn="NU1701"/>' } else { '' }
+    $native = if ($Executable) { '<PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" /><PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.3" />' } else { '' }
     $output = if ($Executable) { 'Exe' } else { 'Library' }
     $useWpf = if ($Wpf) { '<UseWPF>true</UseWPF>' } else { '' }
     @"
@@ -61,12 +61,12 @@ try {
 "@ | Set-Content (Join-Path $work 'NuGet.Config') -Encoding utf8
     $code = @'
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
 var backend = new PdfPigBackend();
-var editor = new ITextPdfEditor(backend);
+var editor = new ManagedPdfEditor(backend);
 var document = await editor.CreateAsync();
 document = await editor.ApplyAsync(document, new IPdfEditOperation[] { new AddText(1, new PdfPoint(30, 60), "NuGet consumption") });
 if (!(await backend.GetPageTextAsync(document, 1)).Text.Contains("NuGet consumption")) throw new Exception("Packaged editor failed.");
@@ -77,7 +77,7 @@ var session = new PdfSession(backend, editor);
 await using var viewport = new PdfViewportController(session, renderer, backend);
 Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rendering.");
 '@
-    $engine = New-Consumer -Name EngineConsumer -Framework net8.0 -References $ids[0..4] -Code $code -Executable $true
+    $engine = New-Consumer -Name EngineConsumer -Framework net8.0 -References $ids[0..5] -Code $code -Executable $true
     $avalonia = New-Consumer -Name AvaloniaConsumer -Framework net8.0 -References @('ProPDF.Avalonia') -Code 'public static class Consumer { public static ProPDF.Avalonia.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     $wpf = New-Consumer -Name WpfConsumer -Framework net8.0-windows -References @('ProPDF.Wpf') -Wpf $true -Code 'public static class Consumer { public static ProPDF.Wpf.PdfEditor Create(ProPDF.Presentation.PdfEditorContext c) => new() { Context = c }; }'
     foreach ($project in @($engine,$avalonia,$wpf)) {
@@ -85,7 +85,7 @@ Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rende
         Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore','--disable-build-servers','-p:UseSharedCompilation=false')
     }
     Invoke-DotNet -Arguments @('run','--project',$engine,'-c','Release','--no-build')
-    Write-Host "PASS: all seven standalone packages at $version."
+    Write-Host "PASS: all eight standalone packages at $version."
 } finally {
     $env:MSBUILDDISABLENODEREUSE = $previousNodeReuse
     # Antivirus or third-party build services may briefly retain the temporary directory on Windows.

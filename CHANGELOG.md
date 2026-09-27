@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.2 — Unreleased
+
+Replaced the previous iText/pdfSweep backend with ProPDF-owned MIT libraries: `ProPDF.Kernel` and `ProPDF.Editing`. Added classic/stream/hybrid cross-references, compressed objects, bounded lossless filters/predictors, reachable/incremental serialization, Standard-security R2–R6 reading and AES-256 R6 writing, TrueType embedding, native edits/forms/annotations/navigation, conservative content-group redaction, and platform RSA/ECDSA detached signing. Preserved the Core/UI contracts and migrated the regression suite. Added a fail-closed permissive transitive-license gate, independent cipher fixtures, generated font tests and package provenance/notices. The solution now ships eight reusable packages.
+
+This is not complete Acrobat parity. The owned backend has explicit restrictions for international password preparation, advanced typography, redaction semantics, tagged import, certified-document changes and signature trust. See the migration and owned-engine guides.
+
 ## Unreleased — 0.1.0-alpha.1 development
 
 ### Shared engine and native editors

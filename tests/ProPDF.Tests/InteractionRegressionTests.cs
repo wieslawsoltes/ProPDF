@@ -1,6 +1,6 @@
 using ProPDF.Core;
 using ProPDF.Engine.PdfPig;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
 using Xunit;
@@ -13,7 +13,7 @@ public sealed class InteractionRegressionTests
     public async Task OlderSearchCannotReplaceNewerResults()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(2);
         var session = new PdfSession(backend, editor);
         using (var input = document.OpenRead()) await session.OpenAsync(input);
@@ -38,7 +38,7 @@ public sealed class InteractionRegressionTests
     public async Task AxisAlignedInkIsNotDiscarded(double endX, double endY)
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(size: new PdfSize(300, 400));
         var session = new PdfSession(backend, editor);
         using (var input = document.OpenRead()) await session.OpenAsync(input);
@@ -59,7 +59,7 @@ public sealed class InteractionRegressionTests
     public async Task SearchTargetSurvivesScrollClamping(PdfLayoutMode mode)
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(3, new PdfSize(400, 600));
         document = await editor.ApplyAsync(document, new IPdfEditOperation[]
         {

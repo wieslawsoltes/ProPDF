@@ -1,0 +1,16 @@
+{
+  "reviewed": {
+    "xunit.abstractions/2.0.3": {
+      "license": "Apache-2.0",
+      "manifest_sha256": "e59191df9e3047dd953b695c886597786ac2771f66897baa40877f643da9f7b1",
+      "source": "https://github.com/xunit/abstractions.xunit/blob/main/license.txt",
+      "note": "Legacy package declares a license URL, not an SPDX expression. Exact version and nuspec are pinned; test dependency only. Package provenance hash is recorded in the audit output."
+    },
+    "avalonia.angle.windows.natives/2.1.27548.20260419": {
+      "license": "BSD-3-Clause",
+      "license_file_sha256": "54aff7276217df9f6b5181613999d208c9e40d2b1d51bf55217837e6871a4a63",
+      "source": "https://chromium.googlesource.com/angle/angle/+/main/LICENSE",
+      "note": "Exact package version and bundled LICENSE text reviewed as the ANGLE three-clause BSD license. Preserve native third-party notices when distributing applications."
+    }
+  }
+}

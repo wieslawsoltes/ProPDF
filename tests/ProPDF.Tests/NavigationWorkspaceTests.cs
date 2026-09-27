@@ -1,5 +1,5 @@
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
@@ -12,7 +12,7 @@ public sealed class NavigationWorkspaceTests
     [Fact]
     public async Task ExternalLinksRequireAConfirmedExplicitCommand()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync();
         document = await editor.ApplyAsync(document, new IPdfEditOperation[]
         { new AddAnnotation(1, new PdfRect(20, 30, 100, 20), PdfAnnotationKind.Link, Uri: "https://example.org/review") });
@@ -40,7 +40,7 @@ public sealed class NavigationWorkspaceTests
     [Fact]
     public async Task NavigationSelectionIsInvalidatedWhenDocumentChanges()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(2);
         document = await editor.ApplyAsync(document, new IPdfEditOperation[] { new InsertOutline("Chapter", 2) });
         var session = new PdfSession(backend, editor);
