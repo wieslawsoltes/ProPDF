@@ -21,6 +21,7 @@ public sealed partial class PdfViewportController
     public bool BeginInteraction(PdfPoint point, bool forcePan = false)
     {
         if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) return false;
+        if (!forcePan && Tool == PdfTool.EditObject) return BeginObjectInteraction(point);
         lock (_gate)
         {
             if (_disposed || _snapshot is null) return false;
@@ -42,6 +43,7 @@ public sealed partial class PdfViewportController
     public void MoveInteraction(PdfPoint point)
     {
         if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) return;
+        if (MoveObjectInteraction(point)) return;
         PdfPoint? pan = null;
         lock (_gate)
         {
@@ -65,6 +67,7 @@ public sealed partial class PdfViewportController
     public async Task EndInteractionAsync(PdfPoint point, CancellationToken cancellationToken = default)
     {
         MoveInteraction(point);
+        if (await EndObjectInteractionAsync(point, cancellationToken).ConfigureAwait(false)) return;
         DragState? drag;
         PdfSelection? selection;
         PdfSnapshot? document;
@@ -117,6 +120,7 @@ public sealed partial class PdfViewportController
             PdfTool.Highlight => new AddAnnotation(selection.PageNumber, bounds, PdfAnnotationKind.Highlight),
             PdfTool.Note => new AddAnnotation(selection.PageNumber, bounds, PdfAnnotationKind.Note, text),
             PdfTool.FreeText => new AddAnnotation(selection.PageNumber, bounds, PdfAnnotationKind.FreeText, text),
+            PdfTool.TextBox => new AddTextBox(selection.PageNumber, bounds, text, TextBoxFontSize, Alignment: TextBoxAlignment),
             PdfTool.Text => new AddText(selection.PageNumber, new PdfPoint(bounds.X, bounds.Y + Math.Min(14, bounds.Height)), text),
             PdfTool.Rectangle => new AddShape(selection.PageNumber, bounds),
             PdfTool.Ellipse => new AddShape(selection.PageNumber, bounds, PdfShapeKind.Ellipse),
@@ -128,8 +132,8 @@ public sealed partial class PdfViewportController
         await Session.ApplyAsync(operation, selection.Revision, cancellationToken).ConfigureAwait(false);
     }
 
-    public void CancelInteraction() { lock (_gate) _drag = null; Notify(); }
-    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; _selectionGeneration++; } Notify(); }
+    public void CancelInteraction() { lock (_gate) { _drag = null; _objectDrag = null; _objectPreview = _selectedObject?.Bounds; } Notify(); }
+    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; _selectionGeneration++; _selectedObject = null; _objectPreview = null; _objectDrag = null; } Notify(); }
     public void ClearRedactions() { lock (_gate) _redactions.Clear(); Notify(); }
 
     /// <summary>Call only after an explicit application confirmation. Marks themselves are not saved into the PDF.</summary>

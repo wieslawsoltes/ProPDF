@@ -10,6 +10,7 @@ public sealed class PdfEditorContext
     {
         Viewport = viewport ?? throw new ArgumentNullException(nameof(viewport));
         Inspector = inspector;
+        viewport.ConfigureContentService(inspector as IPdfContentService);
         CreateDocument = createDocument;
         DocumentLoader = documentLoader;
     }

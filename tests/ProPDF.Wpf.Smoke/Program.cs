@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ProPDF.SampleSupport;
+using ProPDF.Core;
 using SkiaSharp;
 
 namespace ProPDF.Wpf.Smoke;
@@ -45,6 +46,23 @@ internal static class Program
             if (!ReferenceEquals(follow.Command, workspace.FollowBookmarkCommand)) throw new InvalidOperationException("WPF navigation command binding is missing.");
             var export = Descendants(editor).OfType<Button>().Single(button => button.Name == "ExportPngButton");
             if (!ReferenceEquals(export.Command, workspace.ExportPngCommand)) throw new InvalidOperationException("WPF output command binding is missing.");
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfContentPanel);
+            Pump(workspace.EditObjectsCommand.ExecuteAsync());
+            application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            var editButton = Descendants(editor).OfType<Button>().Single(button => button.Name == "ApplyObjectBoundsButton");
+            if (!ReferenceEquals(editButton.Command, workspace.ApplyObjectBoundsCommand)) throw new InvalidOperationException("Native object-edit command binding is missing.");
+            if (runtime.Viewport.Tool != ProPDF.Presentation.PdfTool.EditObject) throw new InvalidOperationException("Native selector reset the content-edit tool.");
+            var originalObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            workspace.SelectedContentObject = originalObject;
+            workspace.ContentX = (originalObject.Bounds.X + 12).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Pump(workspace.ApplyObjectBoundsCommand.ExecuteAsync());
+            var inspection = runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1);
+            Pump(inspection);
+            var movedObject = inspection.Result.Objects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            if (Math.Abs(movedObject.Bounds.X - originalObject.Bounds.X - 12) > .01) throw new InvalidOperationException("Bound content-edit command did not move native PDF text.");
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("WPF search command failed.");
@@ -55,6 +73,7 @@ internal static class Program
             Pump(runtime.Viewport.WaitForRenderingAsync());
             application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             window.UpdateLayout();
+            if (runtime.Viewport.Tool != ProPDF.Presentation.PdfTool.EditObject) throw new InvalidOperationException("Native selector reset the active tool after viewport updates.");
             if (runtime.Viewport.LastError is { } error) throw new InvalidOperationException(error);
             using (var scene = runtime.Viewport.CaptureScene())
                 if (scene.TileCount == 0) throw new InvalidOperationException("No PDF tiles rendered.");
@@ -80,7 +99,7 @@ internal static class Program
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());
             application.Shutdown();
-            Console.WriteLine($"PASS: WPF software-Skia editor, native output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
+            Console.WriteLine($"PASS: WPF software-Skia editor, native content-edit/output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

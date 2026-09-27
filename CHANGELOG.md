@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — existing content editing
+
+Owned content inspection and revision-bound native transforms, duplication, deletion, visual clipping and wrapped text replacement; shared object selection/drag/corner-resize controls and Edit inspectors for Avalonia/WPF; state-preservation and overflow checks; fractional-scale tile sampling corrections and an approximate display-list byte budget. Includes native command-binding checks and independent parsing/pixel/interaction regressions. Supported paint groups and conservative exclusions are documented in `docs/content-editing.md`; full Acrobat paragraph editing is not claimed.
+
+
 ## 0.1.0-alpha.2 — Unreleased
 
 Replaced the previous iText/pdfSweep backend with ProPDF-owned MIT libraries: `ProPDF.Kernel` and `ProPDF.Editing`. Added classic/stream/hybrid cross-references, compressed objects, bounded lossless filters/predictors, reachable/incremental serialization, Standard-security R2–R6 reading and AES-256 R6 writing, TrueType embedding, native edits/forms/annotations/navigation, conservative content-group redaction, and platform RSA/ECDSA detached signing. Preserved the Core/UI contracts and migrated the regression suite. Added a fail-closed permissive transitive-license gate, independent cipher fixtures, generated font tests and package provenance/notices. The solution now ships eight reusable packages.

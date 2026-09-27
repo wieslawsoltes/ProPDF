@@ -133,7 +133,24 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     public string DocumentKeywords { get => _keywords; set => Set(ref _keywords, value ?? ""); }
     public PdfLayoutMode[] LayoutModes { get; } = Enum.GetValues<PdfLayoutMode>();
     public PdfLayoutMode LayoutMode { get => Viewport.LayoutMode; set { if (Viewport.LayoutMode != value) { Viewport.SetLayoutMode(value); Changed(); } } }
-    public IReadOnlyList<PdfToolDescriptor> Tools => AllTools.Where(item => Available(item.Tool)).ToArray();
+    private IReadOnlyList<PdfToolDescriptor>? _availableTools;
+    private int _availableToolMask;
+    public IReadOnlyList<PdfToolDescriptor> Tools
+    {
+        get
+        {
+            // Stable ItemsSource identity prevents native selectors from resetting selection on each viewport notification.
+            var mask = 0;
+            for (var index = 0; index < AllTools.Length; index++)
+                if (Available(AllTools[index].Tool)) mask |= 1 << index;
+            if (_availableTools is null || mask != _availableToolMask)
+            {
+                _availableToolMask = mask;
+                _availableTools = Array.AsReadOnly(AllTools.Where((_, index) => (mask & (1 << index)) != 0).ToArray());
+            }
+            return _availableTools;
+        }
+    }
     public PdfToolDescriptor? SelectedTool
     {
         get => AllTools.FirstOrDefault(item => item.Tool == Viewport.Tool);
@@ -340,6 +357,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
             Bookmarks = Array.Empty<PdfBookmarkInfo>();
             if (document is not null && _context.Inspector is not null) _ = LoadInspectionAsync(document, _lifetime.Token);
         }
+        RefreshContentState();
         var page = Math.Clamp(Viewport.CurrentPage, 1, Math.Max(1, document?.Pages.Count ?? 1));
         _selectedPage = document?.GetPage(page);
         // Progressive tile updates must not overwrite a page number the user is currently typing.
@@ -375,6 +393,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     private bool Available(PdfTool tool) => tool switch
     {
         PdfTool.Pan or PdfTool.SelectRegion or PdfTool.SelectText => true,
+        PdfTool.EditObject => _context.Inspector is IPdfContentService,
         PdfTool.Highlight or PdfTool.Note or PdfTool.FreeText or PdfTool.Ink => Session.Capabilities.Contains(PdfCapability.Annotations),
         PdfTool.Redact => Session.Capabilities.Contains(PdfCapability.Redaction),
         PdfTool.ReplaceText => Session.Capabilities.Contains(PdfCapability.ContentReplacement),
@@ -383,6 +402,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     };
     private static readonly PdfToolDescriptor[] AllTools =
     [
+        new(PdfTool.EditObject, "Edit existing objects"), new(PdfTool.TextBox, "Wrapped text box"),
         new(PdfTool.Pan, "Hand / pan"), new(PdfTool.SelectText, "Select text"), new(PdfTool.SelectRegion, "Select region"),
         new(PdfTool.Highlight, "Highlight"), new(PdfTool.Note, "Sticky note"), new(PdfTool.FreeText, "Text comment"),
         new(PdfTool.Text, "Insert text"), new(PdfTool.Rectangle, "Rectangle"), new(PdfTool.Ellipse, "Ellipse"),

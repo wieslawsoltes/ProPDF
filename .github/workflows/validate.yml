@@ -8,6 +8,10 @@ on:
       artifact-prefix:
         type: string
         default: validation
+      macos-runner:
+        description: 'Standard macOS runner image. Release validation defaults to Apple Silicon; PR CI explicitly selects Intel.'
+        type: string
+        default: macos-26
 permissions:
   contents: read
 jobs:
@@ -15,8 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pin a supported Apple Silicon image rather than following automatic macOS image migrations.
-        os: [ubuntu-latest, windows-latest, macos-15]
+        os: [ubuntu-latest, windows-latest, '${{ inputs.macos-runner }}']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -26,6 +29,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Archive exact validated source
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p artifacts/source
+          git archive --format=zip --output=artifacts/source/ProPDF-source.zip HEAD
+          git rev-parse HEAD > artifacts/source/commit.txt
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: |

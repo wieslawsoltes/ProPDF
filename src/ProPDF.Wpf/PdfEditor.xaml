@@ -80,6 +80,7 @@
       <DockPanel Grid.Column="4" Background="White">
         <Border DockPanel.Dock="Top" Padding="16,14" BorderBrush="#E3E8F0" BorderThickness="0,0,0,1"><TextBlock Text="INSPECTOR" FontSize="11" FontWeight="SemiBold" Foreground="#617089"/></Border>
         <TabControl BorderThickness="0">
+          <TabItem Header="Edit"><local:PdfContentPanel/></TabItem>
           <TabItem Header="Review"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="12,8">
             <TextBlock Text="COMMENTS" Style="{StaticResource Caption}"/>
             <ListBox ItemsSource="{Binding Annotations}" SelectedItem="{Binding SelectedAnnotation, Mode=TwoWay}" Height="220">

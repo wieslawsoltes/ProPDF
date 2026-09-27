@@ -12,3 +12,6 @@ concurrency:
 jobs:
   validation:
     uses: ./.github/workflows/validate.yml
+    with:
+      # PR/main checks use the standard Intel macOS pool. Release keeps the reusable workflow's ARM64 default.
+      macos-runner: macos-26-intel
