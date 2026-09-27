@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.LogicalTree;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
@@ -34,6 +35,21 @@ internal static class Program
             if (runtime.Session.Current!.Pages[0].Size.Width < runtime.Session.Current.Pages[0].Size.Height)
                 throw new InvalidOperationException("The editor rotate command did not reach the PDF engine.");
             Pump(workspace.UndoCommand.ExecuteAsync());
+            var tabs = editor.GetLogicalDescendants().OfType<TabControl>().Single();
+            var navigationTab = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfNavigationPanel);
+            tabs.SelectedItem = navigationTab;
+            Pump(workspace.LoadNavigationAsync());
+            PumpUntil(() => workspace.NavigationBookmarks.Count == 3);
+            workspace.SelectedBookmark = workspace.NavigationBookmarks[1];
+            Pump(workspace.FollowBookmarkCommand.ExecuteAsync());
+            if (runtime.Viewport.CurrentPage != 2) throw new InvalidOperationException("Bookmark navigation did not reach page two.");
+            Pump(workspace.BackCommand.ExecuteAsync());
+            if (runtime.Viewport.CurrentPage != 1) throw new InvalidOperationException("Navigation history did not restore page one.");
+            PumpUntil(() => editor.GetVisualDescendants().OfType<PdfNavigationPanel>().Any());
+            var followButton = editor.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "FollowBookmarkButton");
+            if (!ReferenceEquals(followButton.Command, workspace.FollowBookmarkCommand)) throw new InvalidOperationException("Native bookmark command binding is missing.");
+            var exportButton = editor.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ExportPngButton");
+            if (!ReferenceEquals(exportButton.Command, workspace.ExportPngCommand)) throw new InvalidOperationException("Native image export command binding is missing.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("The search command found no sample text.");
@@ -62,17 +78,16 @@ internal static class Program
                         var pixel = bitmap.GetPixel(x, y);
                         if (pixel.Blue > pixel.Red + 25 && pixel.Blue > pixel.Green + 15 && pixel.Red < 80) bluePixels++;
                     }
-                if (bluePixels < 200) throw new InvalidOperationException("The PDF canvas appears blank; the sample's blue content was not rendered.");
+                if (bluePixels < 200) throw new InvalidOperationException("The PDF canvas appears blank; sample blue content was not rendered.");
             }
             window.Content = null;
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());
-            Console.WriteLine($"PASS: Avalonia real-Skia editor render, command bindings, search, undo and resource teardown. Screenshot: {path}");
+            Console.WriteLine($"PASS: Avalonia real-Skia editor, native output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
-
     private static void Pump(Task task)
     {
         PumpUntil(() => task.IsCompleted);

@@ -37,6 +37,8 @@ nav:
   - Getting started: getting-started.md
   - Feature matrix: features.md
   - Native editing: editing.md
+  - Output and comparison: output-comparison.md
+  - Navigation and bookmarks: navigation.md
   - Delivery: build-release.md
   - Licensing: licensing.md
   - Dependency compatibility: dependency-compatibility.md

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -30,6 +31,20 @@ internal static class Program
             if (runtime.Session.Current!.Pages[0].Size.Width < runtime.Session.Current.Pages[0].Size.Height)
                 throw new InvalidOperationException("WPF rotate command did not update the document.");
             Pump(workspace.UndoCommand.ExecuteAsync());
+            var tabs = Descendants(editor).OfType<TabControl>().Single();
+            tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfNavigationPanel);
+            Pump(workspace.LoadNavigationAsync());
+            if (workspace.NavigationBookmarks.Count != 3) throw new InvalidOperationException("Native bookmark inspector did not load.");
+            workspace.SelectedBookmark = workspace.NavigationBookmarks[1];
+            Pump(workspace.FollowBookmarkCommand.ExecuteAsync());
+            if (runtime.Viewport.CurrentPage != 2) throw new InvalidOperationException("WPF bookmark navigation did not reach page two.");
+            Pump(workspace.BackCommand.ExecuteAsync());
+            if (runtime.Viewport.CurrentPage != 1) throw new InvalidOperationException("WPF navigation history failed.");
+            application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            var follow = Descendants(editor).OfType<Button>().Single(button => button.Name == "FollowBookmarkButton");
+            if (!ReferenceEquals(follow.Command, workspace.FollowBookmarkCommand)) throw new InvalidOperationException("WPF navigation command binding is missing.");
+            var export = Descendants(editor).OfType<Button>().Single(button => button.Name == "ExportPngButton");
+            if (!ReferenceEquals(export.Command, workspace.ExportPngCommand)) throw new InvalidOperationException("WPF output command binding is missing.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("WPF search command failed.");
@@ -59,16 +74,26 @@ internal static class Program
                         var color = pixels.GetPixel(x, y);
                         if (color.Blue > color.Red + 25 && color.Blue > color.Green + 15 && color.Red < 80) colored++;
                     }
-                if (colored < 200) throw new InvalidOperationException("WPF PDF canvas screenshot is missing its expected blue content.");
+                if (colored < 200) throw new InvalidOperationException("WPF screenshot is missing its expected PDF content.");
             }
             window.Content = null;
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());
             application.Shutdown();
-            Console.WriteLine($"PASS: WPF software-Skia editor render, commands, search, undo and teardown. Screenshot: {path}");
+            Console.WriteLine($"PASS: WPF software-Skia editor, native output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+    }
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        var stack = new Stack<DependencyObject>(); stack.Push(root);
+        while (stack.TryPop(out var current))
+            foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+            {
+                yield return child;
+                stack.Push(child);
+            }
     }
     private static void Pump(Task task)
     {
