@@ -24,7 +24,7 @@ jobs:
           mkdir -p /tmp/cms-check
           printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.12" /></ItemGroup></Project>' > /tmp/cms-check/check.csproj
           dotnet restore /tmp/cms-check/check.csproj
-      - name: Prepare scoped offline compiler and non-font dependency cache
+      - name: Prepare scoped offline compiler and dependency cache
         shell: python
         run: |
           import json, pathlib, shutil, subprocess, tarfile
@@ -36,7 +36,7 @@ jobs:
           paths = [root/'dotnet', root/'LICENSE.txt', root/'ThirdPartyNotices.txt', root/'sdk'/sdk,
               latest(root/'host/fxr','10.'), latest(root/'shared/Microsoft.NETCore.App','10.'), latest(root/'shared/Microsoft.NETCore.App','8.'),
               latest(root/'packs/Microsoft.NETCore.App.Ref','8.')]
-          with tarfile.open(out/'dotnet.tar.gz','w:gz',compresslevel=1) as archive:
+          with tarfile.open(out/'dotnet.tar.gz','w:gz',compresslevel=6) as archive:
               for path in paths: archive.add(path,arcname=str(path.relative_to(root)))
           directories = set()
           for asset in list(pathlib.Path('.').rglob('project.assets.json')) + [pathlib.Path('/tmp/cms-check/obj/project.assets.json')]:
@@ -46,15 +46,25 @@ jobs:
                   for folder in data['packageFolders']:
                       path = pathlib.Path(folder)/item['path']
                       if path.exists(): directories.add(path)
-          def no_fonts(info):
-              if info.name.lower().endswith(('.ttf','.otf','.woff','.woff2')): return None
+          def local_only(info):
+              name = info.name.lower()
+              if name.endswith(('.ttf','.otf','.woff','.woff2','.nupkg')): return None
+              if '/runtimes/' in name:
+                  rid = name.split('/runtimes/',1)[1].split('/')[0]
+                  if rid not in ('linux-x64','linux','unix','any'): return None
               return info
-          with tarfile.open(out/'packages.tar.gz','w:gz',compresslevel=1) as archive:
-              for path in sorted(directories): archive.add(path,arcname='packages/'+path.parent.name+'/'+path.name,filter=no_fonts)
+          with tarfile.open(out/'packages.tar.gz','w:gz',compresslevel=6) as archive:
+              for path in sorted(directories): archive.add(path,arcname='packages/'+path.parent.name+'/'+path.name,filter=local_only)
           print([(p.name,p.stat().st_size) for p in out.iterdir()])
       - uses: actions/upload-artifact@v7
         with:
-          name: offline-engine-toolchain
-          path: artifacts/offline/
+          name: offline-dotnet-sdk
+          path: artifacts/offline/dotnet.tar.gz
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: offline-dotnet-packages
+          path: artifacts/offline/packages.tar.gz
           compression-level: 0
           retention-days: 1
