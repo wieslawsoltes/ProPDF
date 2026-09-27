@@ -68,8 +68,12 @@ internal static class Program
             Pump(workspace.UndoCommand.ExecuteAsync());
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
-            var appearanceButton = editor.GetLogicalDescendants().OfType<Button>().Single(button => button.Name == "ApplyAppearanceButton");
-            var replacementButton = editor.GetLogicalDescendants().OfType<PdfContentPanel>().Single().FindControl<Button>("ReplaceImageButton")!;
+            var contentPanel = (PdfContentPanel)((TabItem)tabs.SelectedItem!).Content!;
+            // Resolve within this control's namescope. Expander content can occur more than once in the logical walk.
+            var appearanceButton = contentPanel.FindControl<Button>("ApplyAppearanceButton")
+                ?? throw new InvalidOperationException("Appearance button is missing from the content panel.");
+            var replacementButton = contentPanel.FindControl<Button>("ReplaceImageButton")
+                ?? throw new InvalidOperationException("Image replacement button is missing from the content panel.");
             if (!ReferenceEquals(appearanceButton.Command, workspace.ApplyAppearanceCommand) ||
                 !ReferenceEquals(replacementButton.Command, workspace.ReplaceImageCommand))
                 throw new InvalidOperationException("Native appearance/image commands are not bound.");
