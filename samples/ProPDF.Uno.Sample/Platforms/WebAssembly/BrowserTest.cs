@@ -30,6 +30,7 @@ public static partial class BrowserTest
         writer.WriteStartObject();
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
         writer.WriteNumber("pageWidth", w.Document?.GetPage(c.CurrentPage).Size.Width ?? 0);
+        writer.WriteNumber("pageItems", ((ListView)Find("PagesList")).Items.Count);
         writer.WriteNumber("page", c.CurrentPage); writer.WriteNumber("zoom", c.Zoom);
         writer.WriteBoolean("dirty", w.Session.IsDirty); writer.WriteBoolean("canUndo", w.Session.CanUndo);
         writer.WriteBoolean("canRedo", w.Session.CanRedo); writer.WriteBoolean("busy", w.IsBusy);
@@ -50,6 +51,20 @@ public static partial class BrowserTest
             writer.WriteNumber("x", p.X); writer.WriteNumber("y", p.Y);
             writer.WriteNumber("width", e.ActualWidth); writer.WriteNumber("height", e.ActualHeight);
             writer.WriteString("type", e.GetType().Name); writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    });
+    [JSExport]
+    public static string Thumbnails() => Json(writer =>
+    {
+        writer.WriteStartArray();
+        foreach (var thumbnail in Elements().OfType<PdfThumbnail>().Where(e => e.IsLoaded && e.ActualHeight > 0))
+        {
+            var p = thumbnail.TransformToVisual(_editor).TransformPoint(new Windows.Foundation.Point(0, 0));
+            writer.WriteStartObject(); writer.WriteNumber("page", thumbnail.PageNumber);
+            writer.WriteNumber("x", p.X); writer.WriteNumber("y", p.Y);
+            writer.WriteNumber("width", thumbnail.ActualWidth); writer.WriteNumber("height", thumbnail.ActualHeight);
+            writer.WriteEndObject();
         }
         writer.WriteEndArray();
     });

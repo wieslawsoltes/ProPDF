@@ -77,7 +77,7 @@ try {
   const failure = await bounded(page.evaluate(() => document.documentElement.dataset.propdfError), 'startup status');
   assert.equal(failure, undefined);
   await progress('load real PDF tiles and form inspector');
-  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.tiles > 0 && s.fields > 0; }, null, { timeout: 30000 });
+  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.tiles > 0 && s.fields > 0 && s.pageItems === s.pages; }, null, { timeout: 30000 });
   const initial = await healthy(); assert.equal(initial.pages, 3); assert.equal(initial.dirty, false);
   assert.ok(await page.locator('canvas').count() > 0); checks.push('real Uno/Skia application and PDF tiles');
   const original = await bounded(page.evaluate(() => propdfTest.TextContent()), 'independent text extraction');
@@ -98,6 +98,34 @@ try {
   }, initialPixels.toString('base64')), 'presented PDF pixels');
   assert.ok(painted > 1000, 'The real browser screenshot must show PDF content, not a blank canvas or splash.');
   checks.push('composited editor screenshot contains rendered PDF pixels');
+  await progress('rendered page thumbnails and pointer navigation');
+  await page.waitForFunction(() => JSON.parse(propdfTest.Thumbnails()).some(t => t.page === 2), null, { timeout: 15000 });
+  const thumbnails = JSON.parse(await bounded(page.evaluate(() => propdfTest.Thumbnails()), 'thumbnail geometry'));
+  const firstThumbnail = thumbnails.find(t => t.page === 1), secondThumbnail = thumbnails.find(t => t.page === 2);
+  assert.ok(firstThumbnail && secondThumbnail);
+  // Read pixels from the actual composited thumbnail region. A list of blank
+  // placeholders does not qualify as rendered thumbnails.
+  let thumbnailPixels = 0;
+  for (let attempt = 0; attempt < 10 && thumbnailPixels < 100; attempt++) {
+    const pixels = await page.screenshot({ timeout: 10000 });
+    thumbnailPixels = await bounded(page.evaluate(async ({ base64, bounds }) => {
+      const image = new Image(); image.src = 'data:image/png;base64,' + base64; await image.decode();
+      const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(Math.ceil(bounds.x), Math.ceil(bounds.y), Math.floor(bounds.width), Math.floor(bounds.height)).data;
+      let count = 0;
+      for (let i = 0; i < data.length; i += 4)
+        if (data[i] < 80 && data[i + 2] > data[i] + 25 && data[i + 2] > data[i + 1] + 15) count++;
+      return count;
+    }, { base64: pixels.toString('base64'), bounds: firstThumbnail }), 'composited thumbnail pixels');
+    if (thumbnailPixels < 100) await page.waitForTimeout(100);
+  }
+  assert.ok(thumbnailPixels >= 100, 'The first page thumbnail must contain the rendered blue PDF header.');
+  await page.screenshot({ path: `${out}/uno-desktop.png`, timeout: 10000 });
+  await page.mouse.click(secondThumbnail.x + secondThumbnail.width / 2, secondThumbnail.y + secondThumbnail.height / 2);
+  await page.waitForFunction(() => { const s = JSON.parse(propdfTest.State()); return s.page === 2 && s.tiles > 0; }, null, { timeout: 15000 });
+  await healthy(); await command('PreviousPageButton'); assert.equal((await state()).page, 1);
+  checks.push('rendered page thumbnails and pointer page navigation');
   await writeFile(`${out}/controls.json`, await bounded(page.evaluate(() => propdfTest.Controls()), 'control geometry'));
   await writeFile(`${out}/accessibility.txt`, await page.locator('body').ariaSnapshot());
   await progress('real pointer rotation');

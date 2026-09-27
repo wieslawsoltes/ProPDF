@@ -2,7 +2,7 @@
 
 ## 0.1.0-alpha.5 — Unreleased
 
-Independent warm-tile cache leasing avoids waiting behind unrelated interpreter work. Stable viewport tile plans avoid redundant scroll cancellation/submission, progressive publication retains matching visible tiles, and dispatcher notifications coalesce. Adds page- and region-relative whole-selection alignment across Avalonia, WPF and Uno, with atomic undo and cropped/rotated coordinates. Deterministic concurrency, cache lifetime, scheduling and native command regression coverage; no new dependencies or GPU/Acrobat speed claims. See `docs/performance.md` and `docs/content-editing.md`.
+Independent warm-tile cache leasing avoids waiting behind unrelated interpreter work. Stable viewport tile plans avoid redundant scroll cancellation/submission, progressive publication retains matching visible tiles, and dispatcher notifications coalesce. Adds page- and region-relative whole-selection alignment across Avalonia, WPF and Uno, with atomic undo and cropped/rotated coordinates. Deterministic concurrency, cache lifetime, scheduling and native command regression coverage; no new dependencies or GPU/Acrobat speed claims. See `docs/performance.md` and `docs/content-editing.md`. Uno page lists now read revision and page entries from one immutable snapshot, fixing empty thumbnails when notifications arrive ahead of workspace refresh. Browser validation checks thumbnail pixels and pointer navigation, and awaits exact native list identity after undo.
 
 ## 0.1.0-alpha.4 — Unreleased
 
