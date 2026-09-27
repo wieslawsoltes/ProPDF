@@ -108,7 +108,7 @@ public sealed record SetFormValue(string Name, string Value) : PdfEditOperation(
 public sealed record RemoveFormField(string Name) : PdfEditOperation(PdfCapability.Forms, "Remove form field");
 public sealed record FlattenForms(string? Name = null) : PdfEditOperation(PdfCapability.Forms, "Flatten forms");
 
-/// <summary>Removes intersecting page content with pdfSweep; it is not a painted rectangle. Does not redact other pages or metadata.</summary>
+/// <summary>Removes supported intersecting content groups with the owned native redactor; it is not a painted rectangle. Does not redact other pages or metadata.</summary>
 public sealed record RedactRegion(int PageNumber, PdfRect Bounds, PdfColor? Fill = null)
     : PdfEditOperation(PdfCapability.Redaction, "Apply content redaction");
 /// <summary>Removes everything in a region and inserts new text. This is not automatic paragraph reflow.</summary>

@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.1.0-alpha.1'
+        default: '0.1.0-alpha.2'
       artifact-prefix:
         type: string
         default: validation
@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Pin a supported Apple Silicon image rather than following automatic macOS image migrations.
+        os: [ubuntu-latest, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -32,6 +33,10 @@ jobs:
             8.0.x
       - name: Restore
         run: dotnet restore ProPDF.slnx
+      - name: Enforce permissive dependency licenses
+        run: python scripts/audit-licenses.py
+      - name: License gate regression tests
+        run: python -m unittest discover -s scripts/tests -v
       - name: Build libraries and native applications
         shell: pwsh
         run: dotnet build ProPDF.slnx -c Release --no-restore "-p:Version=$env:PACKAGE_VERSION"

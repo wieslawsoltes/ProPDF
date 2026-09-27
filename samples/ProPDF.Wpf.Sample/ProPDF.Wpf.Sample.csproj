@@ -3,6 +3,5 @@
   <ItemGroup>
     <ProjectReference Include="../ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
     <ProjectReference Include="../../src/ProPDF.Wpf/ProPDF.Wpf.csproj" />
-    <PackageReference Include="itext.pdfsweep" NoWarn="NU1701" />
   </ItemGroup>
 </Project>

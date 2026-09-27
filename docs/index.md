@@ -11,15 +11,16 @@ ProPDF shares document transactions, SkiaSharp rendering, editing tools and work
 
 | Package | Responsibility |
 | --- | --- |
+| ProPDF.Kernel | Owned objects, xref/object streams, filters, graph writer, incremental revisions and Standard security |
 | ProPDF.Core | Immutable snapshots, transactions, history, atomic saves, geometry and service contracts |
 | ProPDF.Rendering.Skia | Background display-list and tile rendering, caches and native image leases |
 | ProPDF.Engine.PdfPig | Loading, page geometry, text extraction/search and PDF-to-Skia interpretation |
-| ProPDF.Editing.iText | Optional native content/pages, annotations, forms, redaction, encryption and signing |
+| ProPDF.Editing | Optional native content/pages, annotations, forms, redaction, encryption and signing |
 | ProPDF.Presentation | Shared viewport, scenes, interactions, commands and inspector state |
 | ProPDF.Avalonia | Native viewer, thumbnail and editor controls |
 | ProPDF.Wpf | Equivalent Windows WPF controls |
 
-Core has no UI or PDF-vendor dependency. Neither UI package depends on iText. Applications choose their backend at the composition root; the samples explicitly opt into the optional editor.
+Core has no UI or PDF-vendor dependency. Neither UI package depends on a concrete PDF editor. Applications choose their backend at the composition root; the samples explicitly opt into the optional editor.
 
 ## Transaction model
 
@@ -44,3 +45,7 @@ Parsing is in-process, not an OS sandbox. Input/cache limits do not eliminate de
 Page-region redaction is real content removal, not a visual overlay, but it is not full-document sanitization. Original files, backups and undo history remain unredacted. Cryptographic signature validity does not establish certificate trust, revocation or legal identity. See [Native editing](editing.md) for precise restrictions.
 
 [Getting started](getting-started.md) · [Feature matrix](features.md) · [Build and release](build-release.md)
+
+## Owned engine migration
+
+The previous restricted-license backend has been removed. The native editor, PDF kernel, encryption and PDF signature serialization are ProPDF-owned MIT code. See [Owned engine](owned-engine.md) and the [migration guide](dependency-compatibility.md) for the implemented parser/writer and explicit limitations.

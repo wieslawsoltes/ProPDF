@@ -1,6 +1,6 @@
 # Navigation, bookmarks and links
 
-The Navigate inspector is available in both native editor shells. Its view model lives in Presentation; Core defines vendor-independent records and `IPdfNavigationService`, implemented by the optional iText adapter. A viewer-only host may supply another navigation implementation; the PdfPig adapter alone does not currently implement this service.
+The Navigate inspector is available in both native editor shells. Its view model lives in Presentation; Core defines vendor-independent records and `IPdfNavigationService`, implemented by the owned editing backend. A viewer-only host may supply another navigation implementation; the PdfPig adapter alone does not currently implement this service.
 
 ## Reading destinations
 

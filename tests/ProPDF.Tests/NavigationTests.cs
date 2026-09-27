@@ -1,10 +1,7 @@
-using iText.Kernel.Geom;
-using iText.Kernel.Pdf;
-using iText.Kernel.Pdf.Action;
-using iText.Kernel.Pdf.Annot;
-using iText.Kernel.Pdf.Navigation;
+using ProPDF.Kernel;
+using static ProPDF.Kernel.PdfValues;
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
@@ -28,7 +25,7 @@ public sealed class NavigationTests
     [Fact]
     public async Task HierarchicalBookmarksCanBeRenamedMovedAndDeleted()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var original = await editor.CreateAsync(3);
         var document = await editor.ApplyAsync(original, new IPdfEditOperation[]
         {
@@ -49,7 +46,7 @@ public sealed class NavigationTests
     [Fact]
     public async Task SameParentMovesUseFinalSiblingPositionAndCyclesFail()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync();
         document = await editor.ApplyAsync(document, new IPdfEditOperation[]
         { new InsertOutline("A", 1), new InsertOutline("B", 1), new InsertOutline("C", 1), new MoveOutline("0", null, 2) });
@@ -63,7 +60,7 @@ public sealed class NavigationTests
     [InlineData(0)] [InlineData(90)] [InlineData(180)] [InlineData(270)]
     public async Task InternalLinkCoordinatesRoundTripAcrossPageRotation(int rotation)
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(2, new PdfSize(200, 300));
         document = await editor.ApplyAsync(document, new IPdfEditOperation[]
         { new RotatePage(2, rotation), new AddInternalLink(1, new PdfRect(20, 30, 70, 25), 2, new PdfPoint(40, 50)) });
@@ -77,20 +74,21 @@ public sealed class NavigationTests
     [Fact]
     public async Task NamedDestinationsResolveAndUnsafeActionsRemainInert()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         using var bytes = new MemoryStream();
-        using (var writer = new PdfWriter(bytes))
-        {
-            writer.SetCloseStream(false);
-            using var native = new PdfDocument(writer);
-            var first = native.AddNewPage(); var second = native.AddNewPage();
-            native.AddNamedDestination("chapter", PdfExplicitDestination.CreateFit(second).GetPdfObject());
-            first.AddAnnotation(new PdfLinkAnnotation(new Rectangle(10, 10, 60, 20)).SetAction(PdfAction.CreateGoTo("chapter")));
-            first.AddAnnotation(new PdfLinkAnnotation(new Rectangle(10, 40, 60, 20)).SetAction(PdfAction.CreateURI("https://example.org")));
-            var dangerous = new PdfLinkAnnotation(new Rectangle(10, 70, 60, 20));
-            var action = new PdfDictionary(); action.Put(PdfName.S, PdfName.JavaScript); action.Put(PdfName.JS, new PdfString("app.alert('not executed')"));
-            dangerous.GetPdfObject().Put(PdfName.A, action); first.AddAnnotation(dangerous);
-        }
+        var native = PdfFile.Create();
+        var pagesReference = (PdfReference)native.Catalog["Pages"]; var pages = native.Dictionary(pagesReference);
+        PdfReference Page() => native.Add(Dictionary(("Type", new PdfName("Page")), ("Parent", pagesReference),
+            ("MediaBox", Numbers(0, 0, 595, 842)), ("Resources", new PdfDictionary())));
+        var first = Page(); var second = Page(); pages["Kids"] = new PdfArray(first, second); pages["Count"] = new PdfNumber(2L);
+        native.Catalog["Names"] = Dictionary(("Dests", Dictionary(("Names", new PdfArray(new PdfString("chapter"), new PdfArray(second, new PdfName("Fit")))))));
+        var annotations = new PdfArray(); native.Dictionary(first)["Annots"] = annotations;
+        void Link(int y, PdfDictionary action) => annotations.Items.Add(native.Add(Dictionary(("Type", new PdfName("Annot")), ("Subtype", new PdfName("Link")),
+            ("Rect", Numbers(10, y, 70, y + 20)), ("A", action))));
+        Link(10, Dictionary(("S", new PdfName("GoTo")), ("D", new PdfString("chapter"))));
+        Link(40, Dictionary(("S", new PdfName("URI")), ("URI", new PdfString("https://example.org"))));
+        Link(70, Dictionary(("S", new PdfName("JavaScript")), ("JS", new PdfString("app.alert('not executed')"))));
+        bytes.Write(native.Save());
         bytes.Position = 0;
         var document = await backend.OpenAsync(bytes);
         var links = (await editor.ReadNavigationAsync(document)).Links;
@@ -105,18 +103,15 @@ public sealed class NavigationTests
     [Fact]
     public async Task OutlineCycleIsRejectedWithoutRecursing()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         using var bytes = new MemoryStream();
-        using (var writer = new PdfWriter(bytes))
-        {
-            writer.SetCloseStream(false);
-            using var native = new PdfDocument(writer); native.AddNewPage();
-            var root = new PdfDictionary(); root.MakeIndirect(native); root.Put(PdfName.Type, PdfName.Outlines);
-            var child = new PdfDictionary(); child.MakeIndirect(native); child.Put(PdfName.Title, new PdfString("Cycle"));
-            child.Put(PdfName.Parent, root); child.Put(PdfName.Next, child);
-            root.Put(PdfName.First, child); root.Put(PdfName.Last, child);
-            native.GetCatalog().GetPdfObject().Put(PdfName.Outlines, root);
-        }
+        var native = PdfFile.Create(); var pagesReference = (PdfReference)native.Catalog["Pages"]; var pages = native.Dictionary(pagesReference);
+        var page = native.Add(Dictionary(("Type", new PdfName("Page")), ("Parent", pagesReference), ("MediaBox", Numbers(0, 0, 595, 842))));
+        pages["Kids"] = new PdfArray(page); pages["Count"] = new PdfNumber(1L);
+        var root = Dictionary(("Type", new PdfName("Outlines"))); var rootReference = native.Add(root);
+        var child = Dictionary(("Title", new PdfString("Cycle")), ("Parent", rootReference)); var childReference = native.Add(child);
+        child["Next"] = childReference; root["First"] = childReference; root["Last"] = childReference;
+        native.Catalog["Outlines"] = rootReference; bytes.Write(native.Save());
         bytes.Position = 0;
         var document = await backend.OpenAsync(bytes);
         await Assert.ThrowsAsync<InvalidDataException>(() => editor.ReadNavigationAsync(document));
@@ -125,7 +120,7 @@ public sealed class NavigationTests
     [Fact]
     public async Task NavigationHistoryAndRevisionChecksAreShared()
     {
-        var backend = new PdfPigBackend(); var editor = new ITextPdfEditor(backend);
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(3);
         var session = new PdfSession(backend, editor);
         using (var input = document.OpenRead()) await session.OpenAsync(input);

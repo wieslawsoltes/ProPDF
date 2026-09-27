@@ -1,5 +1,5 @@
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
@@ -13,7 +13,7 @@ public sealed class ViewportTests
     private static async Task<(PdfSession Session, PdfPigBackend Backend)> CreateAsync()
     {
         var backend = new PdfPigBackend();
-        var editor = new ITextPdfEditor(backend);
+        var editor = new ManagedPdfEditor(backend);
         var document = await editor.CreateAsync(3, new PdfSize(400, 600));
         document = await editor.ApplyAsync(document, [
             new AddShape(1, new PdfRect(20, 30, 80, 60), Fill: new PdfColor(255, 0, 0)),

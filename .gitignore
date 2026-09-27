@@ -10,3 +10,6 @@ _site/
 *.pfx
 *.p12
 *.key
+
+__pycache__/
+*.pyc

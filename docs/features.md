@@ -23,7 +23,7 @@ Implemented means executable code and regression coverage exist, not qualificati
 | Annotation update/delete | Implemented | Implemented | Free-text appearance changes require replacement |
 | AcroForm authoring | Text/checkbox/choice | Text/checkbox | No full field designer |
 | Fill/remove/flatten forms | Implemented | Fill/flatten | No XFA or JavaScript calculations |
-| Page-region redaction | pdfSweep cleanup | Stage/confirm/apply | Not complete sanitization; tags/widgets restricted |
+| Page-region redaction | Owned content-group cleanup | Stage/confirm/apply | Whole intersecting groups may be removed; tags/ActualText/inline images/patterns/soft masks and other unqualified cases rejected |
 | Metadata/attachments | Implemented | Implemented | Attachments are never executed |
 | Hierarchical bookmarks | Read/insert/update/delete/move subtree | Navigate, insert child, rename, delete | Subtree movement API-only; revision-relative paths |
 | Destinations and links | Common explicit/named local targets, safe URI and named actions | Inspector Follow/Copy; back/forward history | External confirmation; unsafe/chained/remote actions disabled |
@@ -32,7 +32,7 @@ Implemented means executable code and regression coverage exist, not qualificati
 | Signature integrity | Implemented | Not yet | No certificate trust/revocation/LTV verdict |
 | Shared session | Separate local viewports | No multi-window workspace UI yet | Not multi-user collaboration |
 | Accessibility | Basic labels/keyboard | Partial | Full PDF text/UI Automation missing |
-| Packaging | Seven tested NuGet libraries | Samples separate | Public publication requires credentials/configuration |
+| Packaging | Eight reusable NuGet libraries | Samples separate | Public publication requires credentials/configuration |
 
 ## Major remaining Acrobat-level work
 
@@ -40,8 +40,12 @@ General existing-object editing and paragraph reflow; advanced typography and co
 
 ## Validation and qualification
 
-The CI matrix builds all projects, tests independently reopened PDFs, raster pixels, export codecs, transactions, navigation/history and resource lifetime; renders actual Avalonia/WPF editors headlessly; verifies native command bindings; and restores/executes clean consumers of all seven packages. Passing these checks is not full ISO 32000 conformance.
+The CI matrix builds all projects, tests independently reopened PDFs, raster pixels, export codecs, transactions, navigation/history and resource lifetime; renders actual Avalonia/WPF editors headlessly; verifies native command bindings; and restores/executes clean consumers of all eight packages. Passing these checks is not full ISO 32000 conformance.
 
 Add licensed representative files covering embedded/Type3/CID fonts, CMaps, bidirectional scripts, masks, transparency, codecs, damaged cross-reference streams, tags, optional content, signatures and incremental histories. Compare in independent viewers and qualify accessibility/performance on physical machines. Each new feature must state its interoperability and security boundaries.
 
 [Output and comparison](output-comparison.md) · [Navigation and bookmarks](navigation.md)
+
+## Owned backend qualifications
+
+The PDF object model, parser, stream filters, writer, native edits and Standard security handler are now ProPDF-owned MIT code. TrueType cmap 4/12 embedding and Unicode ToUnicode are implemented. Existing SDK operations are retained, but conservative content-group redaction is not partial-image/glyph editing. Passwords currently use printable ASCII; full international preparation, CFF/collections, complex shaping, public-key encryption and damaged-file repair remain gaps. See [Owned engine](owned-engine.md).

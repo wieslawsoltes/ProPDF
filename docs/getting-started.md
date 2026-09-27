@@ -17,12 +17,12 @@ Samples generate a real three-page PDF without bundling confidential documents, 
 ```csharp
 using ProPDF.Core;
 using ProPDF.Engine.PdfPig;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
 
 var backend = new PdfPigBackend();
-var editor = new ITextPdfEditor(backend); // Optional; review licensing.
+var editor = new ManagedPdfEditor(backend); // Optional; review licensing.
 var session = new PdfSession(backend, editor);
 var renderer = new SkiaPdfRenderer(backend);
 var viewport = new PdfViewportController(session, renderer, backend,
@@ -62,7 +62,7 @@ Redaction marks are only staging. Apply confirms actual cleanup; saving/exportin
 
 ## Deployment and lifetime
 
-Linux applications must include SkiaSharp.NativeAssets.Linux.NoDependencies and HarfBuzzSharp.NativeAssets.Linux runtime assets. Font availability affects fallback fidelity; redistribution rights remain the application's responsibility. The optional editing backend requires a package-scoped pdfSweep compatibility exception and appropriate licensing.
+Linux applications must include SkiaSharp.NativeAssets.Linux.NoDependencies and HarfBuzzSharp.NativeAssets.Linux runtime assets. Font availability affects fallback fidelity; redistribution rights remain the application's responsibility. The owned editing backend requires no legacy-PDF compatibility exception; all restored dependencies must pass the permissive-license gate.
 
 Detach controls, dispose externally hosted workspaces, await viewport disposal, then await renderer disposal. Dispose scenes and tile leases. Controls do not dispose shared host-owned services. Samples prompt before discarding unsaved work; custom hosts need their own close policy.
 

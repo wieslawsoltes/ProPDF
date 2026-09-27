@@ -12,9 +12,9 @@ A successful strict MkDocs build and downloadable site artifact are distinct fro
 
 ## NuGet and GitHub releases
 
-Configure ownership of the seven package IDs and a scoped `NUGET_API_KEY` in the protected `nuget-release` environment. Set required reviewers and appropriate branch/tag restrictions. Review all dependency licensing, especially iText/pdfSweep, before distributing compiled samples.
+Configure ownership of the eight package IDs and a scoped `NUGET_API_KEY` in the protected `nuget-release` environment. Set required reviewers and appropriate branch/tag restrictions. Review all dependency licensing, including native notices, before distributing compiled samples.
 
-The Release workflow supports a nonpublishing dry run and requires an exact immutable version tag reachable from main for publication. Library artifacts from ordinary CI are usable as a local NuGet feed but are not a public NuGet listing. No secret, signing credential or commercial license entitlement is included in source.
+The Release workflow supports a nonpublishing dry run and requires an exact immutable version tag reachable from main for publication. Library artifacts from ordinary CI are usable as a local NuGet feed but are not a public NuGet listing. No NuGet secret or signing credential is included in source.
 
 See [Build and release](build-release.md) for validation, archive contents and partial-publication recovery.
 

@@ -1,20 +1,22 @@
-# Dependency compatibility policy
+# Backend migration and compatibility
 
-Libraries target .NET 8 and build with the .NET 10 SDK. Dependency versions are centralized and pinned. Compiler and restore warnings are errors, with one narrowly scoped exception.
+The owned engine replaces the previous `ProPDF.Editing.iText` package with `ProPDF.Editing` and adds `ProPDF.Kernel`. Remove old iText/pdfSweep package references and all related NU1701 suppressions from application projects. No compatibility shim depends on the removed libraries.
 
-## pdfSweep 5.0.7
+| Previous API | Owned replacement |
+| --- | --- |
+| `using ProPDF.Editing.iText` | `using ProPDF.Editing` |
+| `ITextPdfEditor` | `ManagedPdfEditor` |
+| `ITextEditorOptions` | `ManagedPdfEditorOptions` |
+| Vendor certificate wrapper collections | `IEnumerable<X509Certificate2>` |
+| Vendor `IExternalSignature` | `IPdfDetachedSignatureProvider` |
+| Vendor-dependent document opening | `ManagedPdfLoader` or optional independent `PdfPigBackend` |
 
-The upstream `itext.pdfsweep` 5.0.7 package publishes a `net461` assembly, not a .NET Standard target. NuGet therefore restores it in .NET Framework compatibility mode and emits NU1701. The editor and integration-test projects explicitly allow **only this package's NU1701** warning. This does not assert that every upstream API is compatible with modern .NET.
+The Core operation contracts, sessions, viewports, navigation and native UI controls are retained. Both sample applications use the owned editor by default. Signing has an intentional source-breaking change that removes vendor cryptographic types. Existing native form/page/navigation/export regression tests were migrated rather than discarded.
 
-The editor's text/region redaction paths must pass Linux, Windows and macOS integration tests before merge. Image, mask and every codec combination need additional qualification; a successful restore is not proof of runtime compatibility. The issue cannot be solved by changing the target framework of the ProPDF adapter alone. Re-evaluate the exception when upstream publishes a modern target.
+## Changed boundaries
 
-Consumers using warnings-as-errors may need the same direct package-scoped exception in the application composition project:
+The redactor now uses conservative owned content-group removal. It rejects unqualified content instead of falling back to the removed backend; intersecting text objects, paths and image/form invocations can be removed in full. This differs from exact glyph-level and partial-image editing. Standard-password opening currently accepts printable ASCII only; full international password preparation remains work. TrueType embedding is implemented, but CFF/collections/shaping are not.
 
-```xml
-<PackageReference Include="itext.pdfsweep" Version="5.0.7" NoWarn="NU1701" />
-```
+Review [Owned engine](owned-engine.md), [Native editing](editing.md) and the [feature matrix](features.md) before upgrading applications handling unusual or sensitive files. An unchanged operation name does not imply exhaustive equivalence with the removed implementation.
 
-Core, parsing, rendering, presentation and UI controls do not depend on pdfSweep. Applications that cannot accept this compatibility exception can use the viewer/control libraries without the iText editing adapter, or supply a different `IPdfEditor`.
-
-Upstream package: https://www.nuget.org/packages/itext.pdfsweep/5.0.7
-Upstream target declaration: https://github.com/itext/itext-pdfsweep-dotnet/blob/develop/itext/Directory.Build.props
+All libraries target modern .NET 8; WPF targets `net8.0-windows`. Native Skia/HarfBuzz runtime assets must match the deployment platform. Cross-building WPF on Linux/macOS is supported; running WPF still requires Windows. Every release must pass clean external package-consumer validation and the [permissive license gate](licensing.md).

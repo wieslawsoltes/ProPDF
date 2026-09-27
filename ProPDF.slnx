@@ -1,9 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ProPDF.Kernel/ProPDF.Kernel.csproj" />
     <Project Path="src/ProPDF.Core/ProPDF.Core.csproj" />
     <Project Path="src/ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
     <Project Path="src/ProPDF.Engine.PdfPig/ProPDF.Engine.PdfPig.csproj" />
-    <Project Path="src/ProPDF.Editing.iText/ProPDF.Editing.iText.csproj" />
+    <Project Path="src/ProPDF.Editing/ProPDF.Editing.csproj" />
     <Project Path="src/ProPDF.Presentation/ProPDF.Presentation.csproj" />
     <Project Path="src/ProPDF.Avalonia/ProPDF.Avalonia.csproj" />
     <Project Path="src/ProPDF.Wpf/ProPDF.Wpf.csproj" />

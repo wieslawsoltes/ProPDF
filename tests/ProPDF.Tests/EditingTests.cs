@@ -1,10 +1,9 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using iText.Bouncycastleconnector;
-using iText.Kernel.Pdf;
+using ProPDF.Kernel;
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Rendering.Skia;
 using SkiaSharp;
@@ -15,7 +14,7 @@ namespace ProPDF.Tests;
 public sealed class EditingTests
 {
     private readonly PdfPigBackend _backend = new();
-    private ITextPdfEditor Editor => new(_backend);
+    private ManagedPdfEditor Editor => new(_backend);
 
     [Fact]
     public async Task NativeTextRoundTripsThroughIndependentParser()
@@ -122,10 +121,11 @@ public sealed class EditingTests
         Assert.DoesNotContain("SECRET", (await _backend.GetPageTextAsync(redacted, 1)).Text);
         Assert.Contains("Keep this text", (await _backend.GetPageTextAsync(redacted, 1)).Text);
         using var stream = redacted.OpenRead();
-        using var independent = new PdfDocument(new PdfReader(stream));
-        for (var i = 1; i < independent.GetNumberOfPdfObjects(); i++)
-            if (independent.GetPdfObject(i) is PdfStream pdfStream)
-                Assert.DoesNotContain("SECRET-471829", Encoding.Latin1.GetString(pdfStream.GetBytes()));
+        using var all = new MemoryStream(); stream.CopyTo(all);
+        var independent = PdfFile.Open(all.ToArray());
+        foreach (var item in independent.EnumerateObjects())
+            if (item.Value is PdfStream pdfStream)
+                Assert.DoesNotContain("SECRET-471829", Encoding.Latin1.GetString(independent.Decode(pdfStream)));
         await using var renderer = new SkiaPdfRenderer(_backend);
         using var tile = await renderer.RenderTileAsync(redacted, new SkiaTileRequest(1, new PdfRect(0, 0, 220, 100), 1));
         using var pixels = SKBitmap.FromImage(tile.Image);
@@ -200,7 +200,7 @@ public sealed class EditingTests
         using var key = RSA.Create(2048);
         var request = new CertificateRequest("CN=ProPDF ephemeral test", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(1));
-        var chain = new[] { BouncyCastleFactoryCreator.GetFactory().CreateX509CertificateParser().ReadCertificate(certificate.RawData) };
+        var chain = new[] { certificate };
         var document = await Editor.CreateAsync();
         var signing = new PdfSignatureService(_backend);
         var signed = await signing.SignAsync(document, new DotNetRsaSignature(key), chain, "Approval", "Regression test");

@@ -2,8 +2,7 @@
   <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/ProPDF.Engine.PdfPig/ProPDF.Engine.PdfPig.csproj" />
-    <ProjectReference Include="../../src/ProPDF.Editing.iText/ProPDF.Editing.iText.csproj" />
+    <ProjectReference Include="../../src/ProPDF.Editing/ProPDF.Editing.csproj" />
     <ProjectReference Include="../../src/ProPDF.Presentation/ProPDF.Presentation.csproj" />
-    <PackageReference Include="itext.pdfsweep" NoWarn="NU1701" />
   </ItemGroup>
 </Project>

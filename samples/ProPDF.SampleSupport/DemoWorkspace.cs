@@ -1,5 +1,5 @@
 using ProPDF.Core;
-using ProPDF.Editing.iText;
+using ProPDF.Editing;
 using ProPDF.Engine.PdfPig;
 using ProPDF.Presentation;
 using ProPDF.Rendering.Skia;
@@ -12,14 +12,14 @@ public sealed class DemoWorkspace : IAsyncDisposable
     public DemoWorkspace(Action<Action>? dispatch = null)
     {
         Backend = new PdfPigBackend();
-        Editor = new ITextPdfEditor(Backend);
+        Editor = new ManagedPdfEditor(Backend);
         Session = new PdfSession(Backend, Editor);
         Renderer = new SkiaPdfRenderer(Backend);
         Viewport = new PdfViewportController(Session, Renderer, Backend, dispatch);
         Context = new PdfEditorContext(Viewport, Editor, token => Editor.CreateAsync(cancellationToken: token), Backend);
     }
     public PdfPigBackend Backend { get; }
-    public ITextPdfEditor Editor { get; }
+    public ManagedPdfEditor Editor { get; }
     public PdfSession Session { get; }
     public SkiaPdfRenderer Renderer { get; }
     public PdfViewportController Viewport { get; }
@@ -71,10 +71,10 @@ public sealed class DemoWorkspace : IAsyncDisposable
             new AddText(3, new PdfPoint(40, 144), "Snapshots, transactions, layout, parsing, search and tiled rendering.", 12, Color: muted),
             new AddText(3, new PdfPoint(40, 204), "Presentation / Avalonia / Wpf", 16, "Helvetica-Bold", blue),
             new AddText(3, new PdfPoint(40, 234), "One workspace model, with native controls and platform dialogs.", 12, Color: muted),
-            new AddText(3, new PdfPoint(40, 294), "Editing.iText", 16, "Helvetica-Bold", blue),
-            new AddText(3, new PdfPoint(40, 324), "Optional editing and signing adapter with explicit licensing boundaries.", 12, Color: muted),
-            new AddText(3, new PdfPoint(40, 386), "The iText and pdfSweep dependencies require AGPL compliance", 12, Color: navy),
-            new AddText(3, new PdfPoint(40, 410), "or appropriate commercial licenses. UI packages do not depend on them.", 12, Color: navy),
+            new AddText(3, new PdfPoint(40, 294), "Kernel / Editing", 16, "Helvetica-Bold", blue),
+            new AddText(3, new PdfPoint(40, 324), "Owned PDF objects, native editing, encryption and signature handling.", 12, Color: muted),
+            new AddText(3, new PdfPoint(40, 386), "ProPDF-authored libraries use the MIT license.", 12, Color: navy),
+            new AddText(3, new PdfPoint(40, 410), "Dependencies are permissive. No commercial PDF license is required.", 12, Color: navy),
             new AddBookmark("Welcome", 1), new AddBookmark("Review and forms", 2), new AddBookmark("Architecture", 3)
         };
         document = await Editor.ApplyAsync(document, operations, cancellationToken).ConfigureAwait(false);
