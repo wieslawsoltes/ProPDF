@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — atomic multi-object editing
+
+Same-page multi-selection, revision/fingerprint-bound aggregate edits, move/resize/rotate/flip/duplicate/delete, alignment and center/gap distribution. Shared selection geometry and native Avalonia/WPF list/canvas interactions, selection overlays and group commands. Single-object appearance/replacement tools are disabled for groups. Background rendering no longer clears editing diagnostics. Includes atomic rollback, shared-resource, rotation/crop, state-preservation, geometry and native list/command regressions. See `docs/content-editing.md`.
+
 ## 0.1.0-alpha.3 — Unreleased
 
 Owned per-object text/path appearance patches (colors, width/cap/join/dashes, painting, opacity/blend), per-invocation image replacement/interpolation, bounded static sRGB/straight-alpha authoring and all eight EXIF orientations; shared Avalonia/WPF controls and stale-dialog protection. Optional source-pinned Apache-2.0 rendering compatibility fixes regular-image opacity and nearest/linear sampling without modifying saved PDFs. Preserved license/NOTICE/provenance, source-drift gates and output-notice propagation; no commercial/copyleft dependency additions. This is not full Acrobat/conformance/color-management qualification.

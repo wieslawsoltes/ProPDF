@@ -236,6 +236,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     {
         if (_disposed || _busy) return;
         _busy = true;
+        Viewport.ClearError();
         var token = _lifetime.Token;
         Changed(null);
         RefreshCommands();

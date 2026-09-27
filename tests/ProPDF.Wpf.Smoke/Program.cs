@@ -89,6 +89,25 @@ internal static class Program
             Pump(workspace.UndoCommand.ExecuteAsync());
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            var firstMember = workspace.SelectedContentObject!;
+            var secondMember = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your workspace.");
+            var objectList = (ListBox)((PdfContentPanel)tabs.SelectedContent).FindName("ContentObjectsList");
+            application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            objectList.SelectedItems!.Add(secondMember); // Exercise the native list SelectionChanged path.
+            if (workspace.SelectedContentObjects.Count != 2) throw new InvalidOperationException("Native list multi-selection did not reach the shared viewport.");
+            if (workspace.ApplyAppearanceCommand.CanExecute(null)) throw new InvalidOperationException("Single-object appearance unexpectedly accepts a group.");
+            workspace.ContentX = (PdfContentSelection.Bounds(workspace.SelectedContentObjects).X + 8).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Pump(((ProPDF.Presentation.PdfUiCommand)editButton.Command!).ExecuteAsync());
+            var groupInspection = runtime.Editor.ReadPageContentAsync(runtime.Session.Current!, 1);
+            Pump(groupInspection);
+            foreach (var member in new[] { firstMember, secondMember })
+            {
+                var movedMember = groupInspection.Result.Objects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == member.Text);
+                if (Math.Abs(movedMember.Bounds.X - member.Bounds.X - 8) > .01) throw new InvalidOperationException("Native group move did not transform both selected text objects.");
+            }
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Kind == PdfContentObjectKind.Text && item.Text is "Your documents." or "Your workspace."));
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("WPF search command failed.");
@@ -125,7 +144,7 @@ internal static class Program
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());
             application.Shutdown();
-            Console.WriteLine($"PASS: WPF software-Skia editor, native content-edit/output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
+            Console.WriteLine($"PASS: WPF software-Skia editor, native single/multi-object editing and output/navigation bindings, bookmarks/history, search, undo and teardown. Screenshot: {path}");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

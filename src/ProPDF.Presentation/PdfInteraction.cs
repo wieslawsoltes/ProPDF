@@ -18,10 +18,10 @@ public sealed partial class PdfViewportController
     private long _searchGeneration;
     private long _selectionGeneration;
 
-    public bool BeginInteraction(PdfPoint point, bool forcePan = false)
+    public bool BeginInteraction(PdfPoint point, bool forcePan = false, bool toggleContentSelection = false)
     {
         if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)) return false;
-        if (!forcePan && Tool == PdfTool.EditObject) return BeginObjectInteraction(point);
+        if (!forcePan && Tool == PdfTool.EditObject) return BeginObjectInteraction(point, toggleContentSelection);
         lock (_gate)
         {
             if (_disposed || _snapshot is null) return false;
@@ -132,8 +132,8 @@ public sealed partial class PdfViewportController
         await Session.ApplyAsync(operation, selection.Revision, cancellationToken).ConfigureAwait(false);
     }
 
-    public void CancelInteraction() { lock (_gate) { _drag = null; _objectDrag = null; _objectPreview = _selectedObject?.Bounds; } Notify(); }
-    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; _selectionGeneration++; _selectedObject = null; _objectPreview = null; _objectDrag = null; } Notify(); }
+    public void CancelInteraction() { lock (_gate) { _drag = null; _objectDrag = null; _objectPreview = _selectionBounds; } Notify(); }
+    public void ClearSelection() { lock (_gate) { _selection = null; _selectedText = ""; _selectionGeneration++; SetSelectedObjectsLocked([]); } Notify(); }
     public void ClearRedactions() { lock (_gate) _redactions.Clear(); Notify(); }
 
     /// <summary>Call only after an explicit application confirmation. Marks themselves are not saved into the PDF.</summary>

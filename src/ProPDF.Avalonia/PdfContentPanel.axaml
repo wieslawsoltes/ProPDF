@@ -3,7 +3,9 @@
   <TextBlock Text="EXISTING PAGE CONTENT" FontSize="11" FontWeight="SemiBold" Margin="0,8,0,6"/>
   <WrapPanel><Button Content="Select / drag" Command="{Binding EditObjectsCommand}"/><Button Content="Refresh" Command="{Binding RefreshObjectsCommand}"/></WrapPanel>
   <TextBlock Text="{Binding ContentStatus}" TextWrapping="Wrap" FontSize="11" Margin="0,6,0,6"/>
-  <ListBox Height="150" ItemsSource="{Binding ContentObjects}" SelectedItem="{Binding SelectedContentObject, Mode=TwoWay}"/>
+  <ListBox x:Name="ContentObjectsList" Height="150" ItemsSource="{Binding ContentObjects}" SelectionMode="Multiple"/>
+  <TextBlock Text="{Binding ContentSelectionSummary}" FontSize="11" TextWrapping="Wrap" Margin="0,5"/>
+  <WrapPanel><Button Content="Select all" Command="{Binding SelectAllObjectsCommand}"/><Button Content="In region" Command="{Binding SelectRegionObjectsCommand}"/><Button Content="Clear" Command="{Binding ClearObjectsCommand}"/></WrapPanel>
   <TextBlock Text="POSITION AND SIZE · PDF POINTS" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
   <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="18,*,18,*">
     <TextBlock Grid.Row="0" Grid.Column="0" Text="X" VerticalAlignment="Center"/><TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ContentX, Mode=TwoWay}" Margin="2"/>
@@ -14,9 +16,18 @@
   <Button x:Name="ApplyObjectBoundsButton" Content="Apply position / size" Command="{Binding ApplyObjectBoundsCommand}"/>
   <WrapPanel><Button Content="Rotate 90°" Command="{Binding RotateObjectCommand}"/><Button Content="Flip" Command="{Binding FlipObjectCommand}"/></WrapPanel>
   <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicateObjectCommand}"/><Button Content="Delete" Command="{Binding DeleteObjectCommand}"/></WrapPanel>
+  <Expander Header="ALIGN AND DISTRIBUTE" Margin="0,8,0,0">
+    <StackPanel>
+      <TextBlock Text="Uses approximate selection bounds. The first/last objects stay fixed during distribution." FontSize="11" TextWrapping="Wrap" Margin="0,4"/>
+      <ComboBox ItemsSource="{Binding ContentAlignments}" SelectedItem="{Binding ContentAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+      <Button x:Name="AlignObjectsButton" Content="Align selected objects" Command="{Binding AlignObjectsCommand}"/>
+      <ComboBox ItemsSource="{Binding ContentDistributions}" SelectedItem="{Binding ContentDistribution, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+      <Button x:Name="DistributeObjectsButton" Content="Distribute selected objects" Command="{Binding DistributeObjectsCommand}"/>
+    </StackPanel>
+  </Expander>
   <Expander x:Name="AppearanceSection" Header="APPEARANCE" IsExpanded="True" Margin="0,10,0,0">
     <StackPanel>
-      <TextBlock Text="Leave blank to preserve. Colors: #RRGGBB or #RRGGBBAA." FontSize="11" TextWrapping="Wrap" Margin="0,4,0,5"/>
+      <TextBlock Text="Select one object for appearance changes. Leave blank to preserve. Colors: #RRGGBB or #RRGGBBAA." FontSize="11" TextWrapping="Wrap" Margin="0,4,0,5"/>
       <StackPanel IsEnabled="{Binding CanSetContentColors}">
         <TextBlock Text="Fill / text color"/><TextBox Text="{Binding ContentFillColor, Mode=TwoWay}"/>
         <TextBlock Text="Stroke color" Margin="0,5,0,2"/><TextBox Text="{Binding ContentStrokeColor, Mode=TwoWay}"/>

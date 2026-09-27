@@ -77,7 +77,7 @@ public sealed class PdfView : Control
         if (!properties.IsLeftButtonPressed && !properties.IsMiddleButtonPressed) return;
         Focus();
         var point = e.GetPosition(this);
-        if (Controller?.BeginInteraction(new PdfPoint(point.X, point.Y), properties.IsMiddleButtonPressed) == true)
+        if (Controller?.BeginInteraction(new PdfPoint(point.X, point.Y), properties.IsMiddleButtonPressed, (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta | KeyModifiers.Shift)) != 0) == true)
         {
             e.Pointer.Capture(this);
             e.Handled = true;

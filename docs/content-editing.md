@@ -70,3 +70,22 @@ Raster tile origins now use device-space translations calculated in double preci
 The display-list LRU is bounded by both entry count and `MaximumDisplayListBytes` (64 MiB by default). A picture larger than the configured estimate is rendered transiently instead of retained. `GetStatisticsAsync` reports `ApproximateDisplayListBytes`. Skia's estimate does not account for all externally referenced images, fonts, decoder state or native allocation overhead; this is not a total process-memory bound. Raster cache accounting similarly uses logical image dimensions rather than every native allocation.
 
 Sampling regression tests compare assembled tiles against a whole-page image at fractional scales. Vector coverage is checked separately with RMS, changed-area and tile-border error limits: Skia can produce slightly different antialiased vector-edge coverage when a path is clipped into tiles. Pixel-identical rendering of all vector paths is not claimed, and no speed advantage over Acrobat has been established.
+
+## Multi-object selection and atomic editing
+
+Use Ctrl/Command-click or Shift-click in the page canvas to toggle objects in a selection. The Edit inspector's list also supports native multiple selection. **Select all**, **In region**, and **Clear** provide explicit selection controls; region selection uses the approximate object bounds, not exact painted ink. A selection is limited to 1,000 objects on one page. Read-only objects may be inspected/selected, but prevent an editing transaction rather than being silently ignored.
+
+Position/size now describes the selection's union. Dragging a selected member moves the whole selection; dragging a union corner resizes it. Rotate and flip use the common center. Duplication and deletion create one undo step. Each duplicate is painted immediately before its original invocation; this is not a new persistent PDF group or a change to the ordering of the original objects. Appearance, image/text replacement and visual clipping remain single-object commands, disabled for a group to avoid changing an arbitrary primary member.
+
+Alignment requires two objects and targets the union's left, right, top, bottom or center. Distribution requires three objects and equalizes centers or nonnegative gaps, keeping the sorted first/last objects fixed. Impossible nonoverlapping gap layouts are rejected; objects are not shrunk to make them fit. Logical stroke bounds are conservative, so nonuniform resizing may yield small differences when bounds are re-inspected.
+
+```csharp
+var content = await editor.ReadPageContentAsync(snapshot, 1);
+var selected = content.Objects.Where(o => o.CanEdit).Take(3).ToArray();
+var operation = PdfContentSelection.Transform(selected, PdfAffineTransform.Translation(12, 8));
+var updated = await editor.ApplyAsync(snapshot, new IPdfEditOperation[] { operation });
+```
+
+`EditContentObjects` also accepts one typed edit per selected invocation. It resolves all handles against the original page inspection before rewriting its instruction ranges in original painting order. Mixed revisions/pages/fingerprints, duplicate handles, nested selections, stale or unsupported objects and invalid transforms are rejected. This avoids applying successive single-object operations whose first rewrite would invalidate the remaining fingerprints. Failed/cancelled edits do not publish a new snapshot. Use one aggregate operation, not a batch of independently inspected stale single-object edits.
+
+The selection is cleared on document revision/page changes. Existing PDFs are not rasterized, and shared image/Form resources are not overwritten by invocation transforms. This remains whole-invocation editing, not nested Form/span editing, rich paragraph reflow, exact ink selection or a sanitization guarantee.
