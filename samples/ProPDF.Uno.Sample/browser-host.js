@@ -2,7 +2,16 @@
 let dirty = false;
 export function setDirty(value) { dirty = value; }
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
-export function failure(error) { document.documentElement.dataset.propdfError = error; console.error(error); }
+export function failure(error) {
+    document.documentElement.dataset.propdfError = error; console.error(error);
+    let panel = document.getElementById('propdf-startup-error');
+    if (!panel) {
+        panel = document.createElement('pre'); panel.id = 'propdf-startup-error'; panel.setAttribute('role', 'alert');
+        panel.style.cssText = 'position:fixed;inset:24px;z-index:2147483647;padding:24px;overflow:auto;white-space:pre-wrap;background:white;color:#12213d;font:14px/1.5 system-ui;border:1px solid #cbd3e0';
+        document.body.append(panel);
+    }
+    panel.textContent = 'ProPDF could not initialize. Reload to retry.\n\n' + error;
+}
 export async function ready() {
     document.documentElement.dataset.propdfReady = 'true';
     if (new URL(location.href).searchParams.get('test') === '1') {
