@@ -5,7 +5,7 @@ Implemented means executable code and regression coverage exist, not qualificati
 | Area | SDK | Built-in shell | Boundary |
 | --- | --- | --- | --- |
 | Loading/passwords | Implemented | Implemented | Bounded input, not an OS sandbox |
-| Skia rendering | Implemented | Avalonia and WPF | CPU raster tiles; upstream fidelity limits |
+| Skia rendering | Implemented | Avalonia, WPF and Uno | CPU raster tiles; upstream fidelity limits |
 | Layout/zoom/pan/navigation | Implemented | Implemented | Continuous, facing, single-page |
 | Lazy thumbnails | Implemented | Virtualized page strip | Bounded dimensions |
 | Extraction/search | Implemented | Find/next/previous | Word-based; literal/regex; stale result rejection |
@@ -55,3 +55,5 @@ Add licensed representative files covering embedded/Type3/CID fonts, CMaps, bidi
 The PDF object model, parser, stream filters, writer, native edits and Standard security handler are now ProPDF-owned MIT code. TrueType cmap 4/12 embedding and Unicode ToUnicode are implemented. Existing SDK operations are retained, but conservative content-group redaction is not partial-image/glyph editing. Passwords currently use printable ASCII; full international preparation, CFF/collections, complex shaping, public-key encryption and damaged-file repair remain gaps. See [Owned engine](owned-engine.md).
 
 Multi-object selection now supports atomic same-page move/resize/rotate/flip/duplicate/delete, alignment and center/gap distribution in both native editors. The 1,000-object limit, whole-invocation semantics and logical-bound restrictions are described in [Content editing](content-editing.md#multi-object-selection-and-atomic-editing).
+
+Uno browser/desktop integration and its platform-specific limits are documented in [Uno Platform](uno-platform.md).

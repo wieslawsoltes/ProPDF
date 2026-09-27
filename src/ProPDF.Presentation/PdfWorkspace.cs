@@ -266,10 +266,15 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     private async Task SaveAsync(bool saveAs, CancellationToken token)
     {
         if (Viewport.PendingRedactions != 0) throw new InvalidOperationException("Apply or clear redaction marks before saving. Marks alone do not redact a PDF.");
-        var path = !saveAs ? Session.FilePath : null;
+        var path = !saveAs && _dialogs is not IPdfWorkspaceFileTransfer { AlwaysPickSaveDestination: true } ? Session.FilePath : null;
         path ??= await _dialogs.PickSavePathAsync(Session.FilePath is { } existing ? Path.GetFileName(existing) : "document.pdf", token);
         if (Viewport.PendingRedactions != 0) throw new InvalidOperationException("Redaction marks were added while the save dialog was open. Apply or clear them first.");
-        if (path is not null) await Session.SaveAsAsync(path, token);
+        if (path is not null)
+        {
+            if (_dialogs is IPdfWorkspaceFileTransfer transfer)
+                await Session.SaveAndPublishAsync(path, transfer.PublishFileAsync, token);
+            else await Session.SaveAsAsync(path, token);
+        }
     }
     private async Task InsertImageAsync(CancellationToken token)
     {
@@ -299,6 +304,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
         if (!await _dialogs.ConfirmAsync("Export page", "The extracted document is unsigned and unencrypted. Continue?", token)) return;
         var extracted = await _context.PageExtractor!.ExtractPagesAsync(document, [page], token);
         await PdfStreams.SaveAtomicAsync(extracted, path, token);
+        await PublishOutputAsync(path, token);
     }
     private async Task AddAttachmentAsync(CancellationToken token)
     {
@@ -329,9 +335,13 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
             }
             token.ThrowIfCancellationRequested();
             File.Move(temporary, target, overwrite: true);
+            await PublishOutputAsync(path, token);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
+    private Task PublishOutputAsync(string path, CancellationToken token) =>
+        _dialogs is IPdfWorkspaceFileTransfer transfer ? transfer.PublishFileAsync(path, token) : Task.CompletedTask;
 
     private void ViewportInvalidated(object? sender, EventArgs args)
     {

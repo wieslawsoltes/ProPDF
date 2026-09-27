@@ -68,6 +68,7 @@ public sealed partial class PdfWorkspace
         var image = await Viewport.ExportPageImageAsync(document, page, new PdfRasterExportOptions(dpi, format), cancellationToken: token);
         EnsureNoPendingRedactions();
         await PdfFileOutput.SaveAssetAsync(path, image, token);
+        await PublishOutputAsync(path, token);
     }
     private async Task ExportTextFileAsync(CancellationToken token)
     {
@@ -78,6 +79,7 @@ public sealed partial class PdfWorkspace
         if (path is null) return;
         EnsureNoPendingRedactions();
         await Viewport.ExportTextAsync(document, path, pages, token);
+        await PublishOutputAsync(path, token);
     }
     private async Task ExtractRangeAsync(CancellationToken token)
     {
@@ -90,6 +92,7 @@ public sealed partial class PdfWorkspace
         var result = await _context.PageExtractor!.ExtractPagesAsync(document, pages, token);
         EnsureNoPendingRedactions();
         await PdfStreams.SaveAtomicAsync(result, path, token);
+        await PublishOutputAsync(path, token);
     }
     private async Task CompareFileAsync(CancellationToken token)
     {
@@ -115,5 +118,6 @@ public sealed partial class PdfWorkspace
         if (path is null) return;
         await PdfFileOutput.WriteAtomicAsync(path,
             (stream, cancellation) => JsonSerializer.SerializeAsync(stream, comparison, new JsonSerializerOptions { WriteIndented = true }, cancellation), token);
+        await PublishOutputAsync(path, token);
     }
 }

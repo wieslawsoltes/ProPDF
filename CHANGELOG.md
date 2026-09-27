@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-alpha.4 — Unreleased
+
+Add independently packable Uno Platform controls and a .NET 10 browser/desktop sample using the shared editing/rendering engine. Add host file-transfer completion semantics, browser imports/downloads, native inspector panels, browser regression CI and a unified app-plus-documentation Pages deployment.
+
 ## Unreleased — atomic multi-object editing
 
 Same-page multi-selection, revision/fingerprint-bound aggregate edits, move/resize/rotate/flip/duplicate/delete, alignment and center/gap distribution. Shared selection geometry and native Avalonia/WPF list/canvas interactions, selection overlays and group commands. Single-object appearance/replacement tools are disabled for groups. Background rendering no longer clears editing diagnostics. Includes atomic rollback, shared-resource, rotation/crop, state-preservation, geometry and native list/command regressions. See `docs/content-editing.md`.

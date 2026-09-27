@@ -1,0 +1,95 @@
+name: Uno browser and Pages
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: uno-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install toolchain and restore all release dependency graphs
+        run: |
+          dotnet workload install wasm-tools
+          dotnet restore ProPDF.slnx -p:Configuration=Release
+      - name: Collect license evidence
+        run: python scripts/collect-license-evidence.py
+      - name: Build desktop sample
+        run: dotnet build samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop --no-restore
+      - name: Publish real Uno browser sample
+        run: dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-browserwasm -o artifacts/uno --no-restore -p:WasmShellWebAppBasePath=/ProPDF/ -p:WasmShellILLinkerEnabled=false
+      - name: Audit every restored dependency graph
+        run: |
+          python scripts/verify-renderer-source.py
+          python scripts/audit-licenses.py
+          python -m unittest discover -s scripts/tests -v
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Build documentation beside the application
+        run: |
+          python -m pip install -r docs/requirements.txt
+          python -m mkdocs build --strict
+          python scripts/stage-uno-site.py --dist artifacts/uno --out artifacts/www/ProPDF
+      - name: Install browser test runner
+        working-directory: scripts/browser
+        run: |
+          npm install --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Actual browser workflow validation
+        shell: bash
+        run: |
+          python -m http.server 4173 --directory artifacts/www > artifacts/uno-http.log 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          node scripts/browser/uno-smoke.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: uno-browser-diagnostics
+          path: artifacts/browser/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: uno-browser-validation
+          path: |
+            artifacts/
+            samples/ProPDF.Uno.Sample/obj/project.assets.json
+            src/ProPDF.Uno/obj/project.assets.json
+          if-no-files-found: warn
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          path: artifacts/www/ProPDF
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: browser
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - id: deployment
+        uses: actions/deploy-pages@v4

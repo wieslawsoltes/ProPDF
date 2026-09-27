@@ -14,8 +14,8 @@ import shutil
 import sys
 import xml.etree.ElementTree as ET
 
-FORBIDDEN_IDS = ("itext", "itext7", "itextsharp", "itext.pdfsweep", "itext7.pdfsweep")
-PERMISSIVE = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "0BSD", "BSL-1.0", "Unlicense", "CC0-1.0", "FTL"}
+FORBIDDEN_IDS = ("itext", "itext7", "itextsharp", "itext.pdfsweep", "itext7.pdfsweep", "libvlcsharp")
+PERMISSIVE = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "0BSD", "BSL-1.0", "Unlicense", "CC0-1.0", "FTL", "Unicode-3.0"}
 
 
 def permissive_expression(expression: str) -> bool:
@@ -58,7 +58,7 @@ def forbidden_id(package: str) -> bool:
 
 def inspect_package(key: str, directory: pathlib.Path, policy: dict) -> dict:
     if forbidden_id(key):
-        raise ValueError(f"Restricted PDF dependency: {key}")
+        raise ValueError(f"Restricted PDF/media dependency: {key}")
     manifests = list(directory.glob("*.nuspec"))
     if len(manifests) != 1:
         raise ValueError(f"Missing/ambiguous package manifest: {key}")
@@ -104,7 +104,6 @@ def audit(root: pathlib.Path, policy_path: pathlib.Path, allow_partial: bool = F
     records: dict[str, dict] = {}
     checked = []
     for project in projects:
-        # Support normal obj and architecture-qualified MSBuild intermediate layouts.
         assets = list((project.parent / "obj").rglob("project.assets.json")) if (project.parent / "obj").exists() else []
         if not assets:
             if allow_partial:
@@ -126,7 +125,6 @@ def audit(root: pathlib.Path, policy_path: pathlib.Path, allow_partial: bool = F
                     raise ValueError(f"Inconsistent package content across project graphs: {key}")
                 records[key] = record
                 if notices is not None:
-                    # Preserve only textual notices/manifests, never fonts, native binaries or credentials.
                     target = notices / value["path"]
                     target.mkdir(parents=True, exist_ok=True)
                     for candidate in directory.rglob("*"):

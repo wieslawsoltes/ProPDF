@@ -1,0 +1,28 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <IsPackable>true</IsPackable>
+    <GenerateLibraryLayout>true</GenerateLibraryLayout>
+    <UnoFeatures>Skia;SkiaRenderer</UnoFeatures>
+    <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
+    <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <LangVersion>14.0</LangVersion>
+    <Description>Reusable Uno Platform PDF viewer, lazy thumbnails and editor shell using shared ProPDF presentation and Skia scenes.</Description>
+    <UnoNoticeDirectory>$(MSBuildThisFileDirectory)../../artifacts/upstream-notices</UnoNoticeDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" />
+    <PackageReference Include="Uno.WinUI" Version="6.7.135" />
+    <PackageReference Include="Uno.WinUI.Graphics2DSK" Version="6.7.135" />
+    <None Include="$(UnoNoticeDirectory)/*.txt" Pack="true" PackagePath="licenses/Uno/" />
+    <!-- .targets files are not default None items in the Uno SDK. Include explicitly;
+         Update on a nonexistent item silently omitted the package's required import. -->
+    <None Remove="buildTransitive/ProPDF.Uno.targets" />
+    <None Include="buildTransitive/ProPDF.Uno.targets" Pack="true" PackagePath="buildTransitive/ProPDF.Uno.targets" />
+  </ItemGroup>
+  <Target Name="RequireReviewedUnoNotices" BeforeTargets="GenerateNuspec">
+    <Error Condition="!Exists('$(UnoNoticeDirectory)/Uno-Eventing-LICENSE.txt') Or !Exists('$(UnoNoticeDirectory)/Uno-ICU-LICENSE.txt') Or !Exists('$(UnoNoticeDirectory)/ICU-77-LICENSE.txt')" Text="Run python scripts/fetch-uno-notices.py before packing. The full pinned Uno/ICU notices must accompany the package." />
+  </Target>
+</Project>

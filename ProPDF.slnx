@@ -8,11 +8,13 @@
     <Project Path="src/ProPDF.Presentation/ProPDF.Presentation.csproj" />
     <Project Path="src/ProPDF.Avalonia/ProPDF.Avalonia.csproj" />
     <Project Path="src/ProPDF.Wpf/ProPDF.Wpf.csproj" />
+    <Project Path="src/ProPDF.Uno/ProPDF.Uno.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
     <Project Path="samples/ProPDF.Avalonia.Sample/ProPDF.Avalonia.Sample.csproj" />
     <Project Path="samples/ProPDF.Wpf.Sample/ProPDF.Wpf.Sample.csproj" />
+    <Project Path="samples/ProPDF.Uno.Sample/ProPDF.Uno.Sample.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProPDF.Tests/ProPDF.Tests.csproj" />

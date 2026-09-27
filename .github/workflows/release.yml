@@ -7,9 +7,9 @@ on:
       version:
         description: 'SemVer without v'
         required: true
-        default: '0.1.0-alpha.3'
+        default: '0.1.0-alpha.4'
       publish:
-        description: 'Publish the exact matching tag reachable from main; requires NuGet credentials and environment approval'
+        description: 'Publish the exact matching tag reachable from main; requires environment approval'
         type: boolean
         default: false
 permissions:
@@ -25,7 +25,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.version.outputs.publish }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -36,18 +36,13 @@ jobs:
         run: |
           set -euo pipefail
           publish=false
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            version="${GITHUB_REF_NAME#v}"
-            publish=true
-          else
-            version="$INPUT_VERSION"
-            if [[ "$INPUT_PUBLISH" == true ]]; then publish=true; fi
-          fi
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; publish=true
+          else version="$INPUT_VERSION"; if [[ "$INPUT_PUBLISH" == true ]]; then publish=true; fi; fi
           [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]] || { echo 'Invalid version'; exit 1; }
           tag="v$version"
           if [[ "$publish" == true ]]; then
-            git merge-base --is-ancestor HEAD origin/main || { echo 'Only commits reachable from main may publish'; exit 1; }
-            [[ "$(git rev-parse HEAD)" == "$(git rev-parse "$tag^{commit}")" ]] || { echo 'Tag must identify this exact commit'; exit 1; }
+            git merge-base --is-ancestor HEAD origin/main || { echo 'Only reviewed main commits may publish'; exit 1; }
+            [[ "$(git rev-parse HEAD)" == "$(git rev-parse "$tag^{commit}")" ]] || { echo 'Tag must identify this commit'; exit 1; }
           fi
           printf 'version=%s\ntag=%s\npublish=%s\n' "$version" "$tag" "$publish" >> "$GITHUB_OUTPUT"
   validation:
@@ -79,10 +74,10 @@ jobs:
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
-          - os: macos-latest
+          - os: macos-26
             rid: osx-arm64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       RID: ${{ matrix.rid }}
@@ -93,9 +88,12 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
-      - name: Restore complete dependency graph
-        run: dotnet restore ProPDF.slnx
-      - name: Publish self-contained samples
+      - name: Restore every Release graph and required notices
+        run: |
+          dotnet workload install wasm-tools
+          dotnet restore ProPDF.slnx -p:Configuration=Release
+          python scripts/collect-license-evidence.py
+      - name: Publish self-contained native samples
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -105,29 +103,33 @@ jobs:
             dotnet publish samples/ProPDF.Wpf.Sample -c Release -r $env:RID --self-contained true -p:PublishTrimmed=false "-p:Version=$env:VERSION" -o artifacts/wpf
             if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed' }
           }
-      - name: Verify source-pinned renderer and legal notices
-        run: python scripts/verify-renderer-source.py
-      - name: Audit resolved runtime dependencies and collect notices
-        run: python scripts/audit-licenses.py
-      - name: Archive samples with dependency notices
+          if ($IsMacOS) {
+            dotnet publish samples/ProPDF.Uno.Sample -c Release -f net10.0-desktop -r $env:RID --self-contained true -p:PublishTrimmed=false "-p:Version=$env:VERSION" -o artifacts/uno-native
+            if ($LASTEXITCODE -ne 0) { throw 'Uno macOS publish failed' }
+          }
+      - name: Audit final runtime graphs
+        run: |
+          python scripts/verify-renderer-source.py
+          python scripts/collect-license-evidence.py
+          python scripts/audit-licenses.py
+      - name: Archive samples with complete dependency notices
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item artifacts/release -ItemType Directory -Force | Out-Null
-          Copy-Item LICENSE artifacts/avalonia/
-          Copy-Item THIRD-PARTY-NOTICES.md artifacts/avalonia/
-          Copy-Item artifacts/third-party-notices artifacts/avalonia/third-party-notices -Recurse
-          Copy-Item artifacts/licenses.json artifacts/avalonia/licenses.json
-          if ($IsWindows) {
-            Compress-Archive artifacts/avalonia/* "artifacts/release/ProPDF-Avalonia-$env:VERSION-$env:RID.zip"
-            Copy-Item LICENSE artifacts/wpf/
-            Copy-Item THIRD-PARTY-NOTICES.md artifacts/wpf/
-            Copy-Item artifacts/third-party-notices artifacts/wpf/third-party-notices -Recurse
-            Copy-Item artifacts/licenses.json artifacts/wpf/licenses.json
-            Compress-Archive artifacts/wpf/* "artifacts/release/ProPDF-WPF-$env:VERSION-$env:RID.zip"
-          } else {
-            tar -czf "artifacts/release/ProPDF-Avalonia-$env:VERSION-$env:RID.tar.gz" -C artifacts/avalonia .
-            if ($LASTEXITCODE -ne 0) { throw 'Application archive failed' }
+          $apps = @(@{ Path='avalonia'; Name='Avalonia' })
+          if ($IsWindows) { $apps += @{ Path='wpf'; Name='WPF' } }
+          if ($IsMacOS) { $apps += @{ Path='uno-native'; Name='Uno' } }
+          foreach ($app in $apps) {
+            $path = "artifacts/$($app.Path)"
+            Copy-Item LICENSE $path/
+            Copy-Item THIRD-PARTY-NOTICES.md $path/
+            Copy-Item artifacts/third-party-notices "$path/third-party-notices" -Recurse
+            Copy-Item artifacts/upstream-notices "$path/upstream-notices" -Recurse
+            Copy-Item artifacts/licenses.json "$path/licenses.json"
+            $name = "artifacts/release/ProPDF-$($app.Name)-$env:VERSION-$env:RID"
+            if ($IsWindows) { Compress-Archive "$path/*" "$name.zip" }
+            else { tar -czf "$name.tar.gz" -C $path .; if ($LASTEXITCODE -ne 0) { throw 'Archive failed' } }
           }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -135,7 +137,7 @@ jobs:
           path: artifacts/release
   publish:
     if: needs.prepare.outputs.publish == 'true'
-    needs: [prepare, validation,documentation, applications]
+    needs: [prepare, validation, documentation, applications]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: nuget-release
@@ -153,7 +155,7 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '10.0.x'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: release-validation-ubuntu-latest
           path: artifacts/validation
@@ -162,18 +164,15 @@ jobs:
           pattern: release-apps-*
           merge-multiple: true
           path: artifacts/release
-      - name: Collect immutable assets
+      - name: Collect immutable assets and checksums
         run: |
           set -euo pipefail
           cp artifacts/validation/packages/*.nupkg artifacts/release/
           cp artifacts/validation/packages/*.snupkg artifacts/release/
           git archive --format=zip --prefix="ProPDF-$VERSION/" HEAD > "artifacts/release/ProPDF-$VERSION-source.zip"
           (cd artifacts/release && find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
-          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
-            echo 'Release already exists; assets will not be overwritten.'
-            exit 1
-          fi
-      - name: Publish NuGet in dependency order
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then echo 'Existing release assets will not be overwritten'; exit 1; fi
+      - name: Publish nine NuGet packages in dependency order
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
@@ -181,6 +180,5 @@ jobs:
       - name: Create GitHub release
         run: |
           set -euo pipefail
-          flags=()
-          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          flags=(); if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
           gh release create "$RELEASE_TAG" --verify-tag --title "ProPDF $VERSION" --generate-notes "${flags[@]}" artifacts/release/*
