@@ -11,7 +11,7 @@ namespace ProPDF.Editing;
 public sealed partial class ManagedPdfEditor : IPdfContentService
 {
     private sealed record ContentNode(int First, int Last, PdfContentObjectKind Kind, PdfRect Bounds,
-        PdfAffineTransform StartMatrix, IReadOnlyList<PdfContentInstruction> StateEffects, string? Text, string? Resource, string? Reason);
+        PdfAffineTransform StartMatrix, IReadOnlyList<PdfContentInstruction> StateEffects, string? Text, string? Resource, string? Reason, PdfContentImageInfo? ImageInfo = null);
     private sealed record ContentAnalysis(string Fingerprint, IReadOnlyList<PdfContentInstruction> Instructions, IReadOnlyList<ContentNode> Nodes);
     private sealed class ObjectGraphicsState
     {
@@ -50,7 +50,7 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
             var authorization = graph.File.IsOwnerAuthorized ? null : "Owner authorization is required for content editing.";
             if (HasSignatures(graph)) authorization = "Signed documents cannot be rewritten.";
             return new PdfPageContent(source.Id, pageNumber, Array.AsReadOnly(analysis.Nodes.Select((node, index) =>
-                new PdfContentObject(new(source.Id, pageNumber, analysis.Fingerprint, index), node.Kind, node.Bounds, node.Text, node.Resource, authorization ?? node.Reason)).ToArray()));
+                new PdfContentObject(new(source.Id, pageNumber, analysis.Fingerprint, index), node.Kind, node.Bounds, node.Text, node.Resource, authorization ?? node.Reason, node.ImageInfo)).ToArray()));
         }, cancellationToken);
     }
     private static PdfAffineTransform ViewToPdf(NativePage page)
@@ -74,14 +74,14 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
         var rawPage = page.Transform.ToPdf(new PdfRect(0, 0, page.Transform.ViewSize.Width, page.Transform.ViewSize.Height));
         var tagged = graph.File.Catalog.Contains("StructTreeRoot") || page.Dictionary.Contains("StructParents"); var marked = 0; var compatible = 0;
         string? Reason() => tagged ? "Tagged content requires structure-tree editing." : marked > 0 ? "Marked or optional content is read-only in this object editor." : state.Reason;
-        void Add(ObjectGroup group, int last, PdfContentObjectKind kind, string? resource = null)
+        void Add(ObjectGroup group, int last, PdfContentObjectKind kind, string? resource = null, PdfContentImageInfo? imageInfo = null)
         {
             if (group.Bounds is not { } bounds) return;
             if (nodes.Count >= options.MaximumObjects) throw new InvalidDataException("Content-object budget exceeded.");
             string? reason = group.Reason;
             try { group.Matrix.Validate(); } catch (ArgumentOutOfRangeException) { reason ??= "Singular or excessive graphics transform."; }
             nodes.Add(new(group.First, last, kind, pdfToView.Map(bounds), group.Matrix, group.Effects.AsReadOnly(),
-                kind == PdfContentObjectKind.Text && group.TextKnown ? group.Text.ToString() : null, resource, reason));
+                kind == PdfContentObjectKind.Text && group.TextKnown ? group.Text.ToString() : null, resource, reason, imageInfo));
         }
         void TextRequired() { if (text is null) throw new InvalidDataException("Text position/show outside BT/ET."); }
         void NewLine()
@@ -214,7 +214,11 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
                             var v = matrix.Cast<PdfNumber>().Select(n => n.Value).ToArray(); objectMatrix = objectMatrix.Concat(new(v[0], v[1], v[2], v[3], v[4], v[5]));
                         }
                     }
-                    var invocation = new ObjectGroup(index, state.Matrix, Reason()); invocation.Include(objectMatrix.Map(objectBounds)); Add(invocation, index, kind, name); break;
+                    var invocation = new ObjectGroup(index, state.Matrix, Reason());
+                    if (xobject.Dictionary.Contains("OC") || xobject.Dictionary.Contains("StructParent"))
+                        invocation.Reason ??= "Optional-content or structured XObjects require semantic editing support.";
+                    invocation.Include(objectMatrix.Map(objectBounds));
+                    Add(invocation, index, kind, name, kind == PdfContentObjectKind.Image ? ImageInfo(graph, xobject) : null); break;
                 case "sh":
                     Count(1); if (text is not null || path is not null) throw new InvalidDataException("Shading inside an unfinished object.");
                     var shading = new ObjectGroup(index, state.Matrix, "Shading geometry is inspect-only."); shading.Include(rawPage); Add(shading, index, PdfContentObjectKind.Shading, Name(0)); break;
@@ -281,6 +285,13 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
         }
         switch (edit)
         {
+            case SetContentAppearance style:
+                replacement.AddRange(StyleContent(graph, page, node, original, style.Appearance, token)); break;
+            case ReplaceContentImage image:
+                ArgumentNullException.ThrowIfNull(image.Image);
+                replacement.Add(ReplaceImageInvocation(graph, page, node, image.Image, image.Interpolate, token)); break;
+            case SetContentImageInterpolation interpolation:
+                replacement.Add(ReplaceImageInvocation(graph, page, node, null, interpolation.Interpolate, token)); break;
             case TransformContentObject transform: Transform(transform.Transform); replacement.AddRange(node.StateEffects); break;
             case DuplicateContentObject duplicate: Transform(duplicate.Transform); replacement.AddRange(original); break;
             case DeleteContentObject: replacement.AddRange(node.StateEffects); break;

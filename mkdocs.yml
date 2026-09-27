@@ -39,6 +39,7 @@ nav:
   - Owned PDF engine: owned-engine.md
   - Native editing: editing.md
   - Existing content and text boxes: content-editing.md
+  - Appearance and images: content-appearance.md
   - Output and comparison: output-comparison.md
   - Navigation and bookmarks: navigation.md
   - Delivery: build-release.md

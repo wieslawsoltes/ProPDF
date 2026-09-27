@@ -14,12 +14,46 @@
   <Button x:Name="ApplyObjectBoundsButton" Content="Apply position / size" Command="{Binding ApplyObjectBoundsCommand}"/>
   <WrapPanel><Button Content="Rotate 90°" Command="{Binding RotateObjectCommand}"/><Button Content="Flip" Command="{Binding FlipObjectCommand}"/></WrapPanel>
   <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicateObjectCommand}"/><Button Content="Delete" Command="{Binding DeleteObjectCommand}"/></WrapPanel>
+  <Expander x:Name="AppearanceSection" Header="APPEARANCE" IsExpanded="True" Margin="0,10,0,0">
+    <StackPanel>
+      <TextBlock Text="Leave blank to preserve. Colors: #RRGGBB or #RRGGBBAA." FontSize="11" TextWrapping="Wrap" Margin="0,4,0,5"/>
+      <StackPanel IsEnabled="{Binding CanSetContentColors}">
+        <TextBlock Text="Fill / text color"/><TextBox Text="{Binding ContentFillColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Stroke color" Margin="0,5,0,2"/><TextBox Text="{Binding ContentStrokeColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Line width · local PDF units" Margin="0,5,0,2"/><TextBox Text="{Binding ContentLineWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Dashes · lengths, or solid" Margin="0,5,0,2"/><TextBox Text="{Binding ContentDash, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Line cap / join" Margin="0,5,0,2"/>
+        <ComboBox ItemsSource="{Binding ContentLineCaps}" SelectedItem="{Binding ContentCap, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch"/>
+        <ComboBox ItemsSource="{Binding ContentLineJoins}" SelectedItem="{Binding ContentJoin, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
+      </StackPanel>
+      <StackPanel IsEnabled="{Binding CanSetContentPainting}">
+        <TextBlock Text="Path painting" Margin="0,5,0,2"/>
+        <ComboBox ItemsSource="{Binding ContentPaintModes}" SelectedItem="{Binding ContentPainting, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch"/>
+      </StackPanel>
+      <TextBlock Text="Opacity · 0–100%" Margin="0,5,0,2"/><TextBox Text="{Binding ContentOpacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+      <TextBlock Text="Blend mode" Margin="0,5,0,2"/>
+      <ComboBox ItemsSource="{Binding ContentBlendModes}" SelectedItem="{Binding ContentBlend, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch"/>
+      <Button x:Name="ApplyAppearanceButton" Content="Apply appearance" Command="{Binding ApplyAppearanceCommand}"/>
+      <TextBlock Text="Keeps original text fonts and positions. Unpainted modes stay unpainted. Form groups are not restyled." FontSize="11" TextWrapping="Wrap" Margin="0,4"/>
+    </StackPanel>
+  </Expander>
+  <Expander Header="IMAGE" Margin="0,6,0,0">
+    <StackPanel>
+      <TextBlock Text="{Binding ContentImageSummary}" FontSize="11" TextWrapping="Wrap" Margin="0,5"/>
+      <CheckBox Content="Interpolate image pixels" IsChecked="{Binding ContentImageInterpolation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+      <Button x:Name="ReplaceImageButton" Content="Replace selected image…" Command="{Binding ReplaceImageCommand}"/>
+      <Button Content="Apply interpolation" Command="{Binding ApplyImageInterpolationCommand}"/>
+      <TextBlock Text="Replacement stretches to the existing image geometry and retains clipping. Only this invocation changes." FontSize="11" TextWrapping="Wrap" Margin="0,5"/>
+    </StackPanel>
+  </Expander>
+  <Expander Header="TEXT REPLACEMENT" Margin="0,8,0,0"><StackPanel>
   <TextBlock Text="REPLACE TEXT OBJECT" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
   <TextBox Text="{Binding ContentText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="78"/>
   <TextBlock Text="Font size" Margin="0,6,0,2"/><TextBox Text="{Binding ContentFontSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
   <ComboBox ItemsSource="{Binding TextAlignments}" SelectedItem="{Binding TextAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,5"/>
   <Button Content="Replace selected text" Command="{Binding ReplaceObjectTextCommand}"/>
   <TextBlock Text="Replacement wraps in the size above. Overflow is rejected. Other objects are preserved." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
+  </StackPanel></Expander>
   <Button Content="Clip to selected region" Command="{Binding ClipObjectCommand}"/>
   <TextBlock Text="Select an object, then use Select region. Clipping only hides content; it is not redaction." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
 </StackPanel></ScrollViewer>

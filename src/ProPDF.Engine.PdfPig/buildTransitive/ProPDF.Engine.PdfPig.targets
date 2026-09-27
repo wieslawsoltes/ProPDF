@@ -1,0 +1,7 @@
+<Project>
+  <!-- Preserve the Apache-2.0 source adapter's required legal notices in consumer output/publication. -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../licenses/PdfPig.Skia/*" Link="licenses/PdfPig.Skia/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

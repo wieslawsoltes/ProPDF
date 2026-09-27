@@ -17,6 +17,13 @@ foreach ($package in $packages) {
         $id = [string]$manifest.package.metadata.id
         if ($id -notin $ids -or $versions.ContainsKey($id)) { throw "Unexpected or duplicate $id" }
         $versions[$id] = [string]$manifest.package.metadata.version
+        if ($id -eq 'ProPDF.Engine.PdfPig') {
+            foreach ($notice in @('LICENSE.txt','NOTICE.txt','PROVENANCE.json','PATCHES.md')) {
+                if (-not $zip.GetEntry("licenses/PdfPig.Skia/$notice")) { throw "Missing renderer legal/provenance asset: $notice" }
+            }
+            if (-not $zip.GetEntry('buildTransitive/ProPDF.Engine.PdfPig.targets')) { throw 'Missing renderer notice propagation.' }
+            if ([string]$manifest.package.metadata.license.InnerText -ne 'MIT AND Apache-2.0') { throw 'Incorrect mixed-source adapter license expression.' }
+        }
         if (-not $zip.GetEntry('README.md')) { throw "$id has no README." }
         if (@($zip.Entries | Where-Object { $_.FullName -like 'lib/*/*.dll' }).Count -eq 0) { throw "$id has no assembly." }
         if (@($zip.Entries | Where-Object { $_.FullName -like 'lib/*/*.xml' }).Count -eq 0) { throw "$id has no XML documentation." }
@@ -85,6 +92,7 @@ Console.WriteLine("PASS: external NuGet editor, extraction and native Skia rende
         Invoke-DotNet -Arguments @('build',$project,'-c','Release','--no-restore','--disable-build-servers','-p:UseSharedCompilation=false')
     }
     Invoke-DotNet -Arguments @('run','--project',$engine,'-c','Release','--no-build')
+    if (@(Get-ChildItem (Join-Path $work 'EngineConsumer/bin') -Recurse -Filter NOTICE.txt | Where-Object { $_.DirectoryName -match 'PdfPig.Skia' }).Count -eq 0) { throw 'Packaged renderer notices were not copied to consumer output.' }
     Write-Host "PASS: all eight standalone packages at $version."
 } finally {
     $env:MSBUILDDISABLENODEREUSE = $previousNodeReuse

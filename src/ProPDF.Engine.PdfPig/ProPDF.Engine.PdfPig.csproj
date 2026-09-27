@@ -1,10 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>PdfPig parsing, text search and Skia display-list backend for ProPDF.</Description>
+    <Description>PdfPig parsing and source-pinned Apache-2.0 Skia interpreter compatibility adapter for ProPDF.</Description>
+    <Copyright>Copyright 2026 ProPDF contributors. Includes third-party Apache-2.0 source; see included copyright notices.</Copyright>
+    <PackageLicenseExpression>MIT AND Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ProPDF.Core/ProPDF.Core.csproj" />
     <ProjectReference Include="../ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
-    <PackageReference Include="PdfPig.Rendering.Skia" />
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="PdfPig.Filters.Dct.JpegLibrary" />
+    <PackageReference Include="PdfPig.Filters.Jbig2.PdfboxJbig2" />
+    <PackageReference Include="PdfPig.Filters.Jpx.OpenJpeg" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" />
+    <None Include="Compatibility/PdfPig.Skia/LICENSE.txt;Compatibility/PdfPig.Skia/NOTICE.txt;Compatibility/PdfPig.Skia/PROVENANCE.json;Compatibility/PdfPig.Skia/PATCHES.md" Pack="true" PackagePath="licenses/PdfPig.Skia/" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="buildTransitive/ProPDF.Engine.PdfPig.targets" Pack="true" PackagePath="buildTransitive/" />
   </ItemGroup>
 </Project>

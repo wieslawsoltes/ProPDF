@@ -68,6 +68,36 @@ internal static class Program
             Pump(workspace.UndoCommand.ExecuteAsync());
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
+            var contentPanel = (PdfContentPanel)((TabItem)tabs.SelectedItem!).Content!;
+            // Resolve within this control's namescope. Expander content can occur more than once in the logical walk.
+            var appearanceButton = contentPanel.FindControl<Button>("ApplyAppearanceButton")
+                ?? throw new InvalidOperationException("Appearance button is missing from the content panel.");
+            var replacementButton = contentPanel.FindControl<Button>("ReplaceImageButton")
+                ?? throw new InvalidOperationException("Image replacement button is missing from the content panel.");
+            if (!ReferenceEquals(appearanceButton.Command, workspace.ApplyAppearanceCommand) ||
+                !ReferenceEquals(replacementButton.Command, workspace.ReplaceImageCommand))
+                throw new InvalidOperationException("Native appearance/image commands are not bound.");
+            workspace.ContentFillColor = "#D040A0";
+            var appearanceRevision = runtime.Session.Current!.Id;
+            Pump(((ProPDF.Presentation.PdfUiCommand)appearanceButton.Command!).ExecuteAsync());
+            if (runtime.Session.Current!.Id == appearanceRevision) throw new InvalidOperationException("Bound appearance command did not edit native content.");
+            var appearanceImage = new ProPDF.Rendering.Skia.PdfRasterExporter(runtime.Renderer)
+                .RenderPageAsync(runtime.Session.Current, 1, new(Dpi: 72));
+            Pump(appearanceImage);
+            using (var styled = appearanceImage.Result)
+            using (var pixels = SKBitmap.FromImage(styled))
+            {
+                var magenta = 0;
+                for (var y = 0; y < pixels.Height; y++) for (var x = 0; x < pixels.Width; x++)
+                {
+                    var pixel = pixels.GetPixel(x, y);
+                    if (Math.Abs(pixel.Red - 208) < 3 && Math.Abs(pixel.Green - 64) < 3 && Math.Abs(pixel.Blue - 160) < 3) magenta++;
+                }
+                if (magenta < 100) throw new InvalidOperationException("Native appearance edit did not render the changed text color.");
+            }
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Kind == PdfContentObjectKind.Text && item.Text == "Your documents.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("The search command found no sample text.");

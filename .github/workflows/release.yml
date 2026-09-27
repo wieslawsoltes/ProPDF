@@ -7,7 +7,7 @@ on:
       version:
         description: 'SemVer without v'
         required: true
-        default: '0.1.0-alpha.2'
+        default: '0.1.0-alpha.3'
       publish:
         description: 'Publish the exact matching tag reachable from main; requires NuGet credentials and environment approval'
         type: boolean
@@ -105,6 +105,8 @@ jobs:
             dotnet publish samples/ProPDF.Wpf.Sample -c Release -r $env:RID --self-contained true -p:PublishTrimmed=false "-p:Version=$env:VERSION" -o artifacts/wpf
             if ($LASTEXITCODE -ne 0) { throw 'WPF publish failed' }
           }
+      - name: Verify source-pinned renderer and legal notices
+        run: python scripts/verify-renderer-source.py
       - name: Audit resolved runtime dependencies and collect notices
         run: python scripts/audit-licenses.py
       - name: Archive samples with dependency notices

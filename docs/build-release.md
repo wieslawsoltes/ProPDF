@@ -16,6 +16,7 @@ dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages
 pwsh scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
 python -m pip install -r docs/requirements.txt
 python -m mkdocs build --strict
+python scripts/verify-renderer-source.py
 ```
 
 ## CI gates
@@ -54,3 +55,6 @@ Release repeats cross-platform build/test/headless/package-consumer validation a
 Publishing several NuGet IDs is not atomic. A failure may leave a subset published. Repair credentials/configuration and rerun the same immutable tag; duplicate skipping supports recovery. Do not move release tags or replace an existing version. Existing GitHub release assets are not silently overwritten.
 
 A green build does not prove full Acrobat compatibility, PDF/A/PDF/UA conformance, sensitive-redaction safety or production performance. Record actual successful run links, versions and qualification evidence when releasing.
+
+
+The source-pinned optional renderer is also checked against its committed source/notice hash inventory. Native release validation retains the original Apache-2.0 LICENSE/NOTICE and patch provenance; clean external package consumers verify the mixed license expression and propagated notices. This does not make the optional interpreter ProPDF-authored or replace an independent conformance/security audit.

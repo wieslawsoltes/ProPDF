@@ -11,13 +11,13 @@
 
 ---
 
-**Development alpha — 0.1.0-alpha.2.** ProPDF is a modular .NET toolkit and native desktop editor. It implements real PDF operations, not just editable overlays. It is not yet a complete Acrobat replacement, a certified redaction product, or a complete signature-trust validator. The [feature matrix](docs/features.md) separates working SDK APIs, desktop workflows and remaining work.
+**Development alpha — 0.1.0-alpha.3.** ProPDF is a modular .NET toolkit and native desktop editor. It implements real PDF operations, not just editable overlays. It is not yet a complete Acrobat replacement, a certified redaction product, or a complete signature-trust validator. The [feature matrix](docs/features.md) separates working SDK APIs, desktop workflows and remaining work.
 
 ## Own the document engine
 
 The PDF object model, tokenizer, cross-reference reader, stream filters, graph writer, security handler and native editing implementation are ProPDF-authored MIT code. **iText, pdfSweep and their adapters have been removed.** No commercial PDF license or copyleft PDF engine is needed by the library or sample applications.
 
-SkiaSharp supplies drawing and image codecs. The optional Apache-2.0 PdfPig adapter supplies an independent parser, text extraction and PDF-to-Skia interpretation. Framework controls remain independent of both concrete editor and loader choices. Restored NuGet dependencies are checked by a fail-closed permissive-license CI gate; reviewed legacy metadata exceptions are version/hash pinned.
+SkiaSharp supplies drawing and image codecs. The optional PdfPig adapter supplies an independent parser and text extraction, plus source-pinned Apache-2.0 PDF-to-Skia interpretation with attributed image-paint corrections. Its mixed-source package is `MIT AND Apache-2.0`; this third-party interpreter is not represented as ProPDF-owned code. Framework controls remain independent of both concrete editor and loader choices. Restored NuGet dependencies are checked by a fail-closed permissive-license CI gate; reviewed legacy metadata exceptions are version/hash pinned.
 
 ## Eight reusable NuGet libraries
 
@@ -131,3 +131,9 @@ ProPDF source is MIT. Preserve the licenses and native notices of the permissive
 The owned editor now inspects text groups, painted paths, image invocations and form invocations. Both native editors provide an **Edit** inspector with selection, dragging, corner resizing, numeric transforms, duplication, deletion, visual clipping and wrapped text replacement. Persistent graphics/text state is preserved so subsequent objects are not accidentally restyled. Revision/fingerprint handles reject stale edits; text overflow rejects the transaction instead of silently dropping lines.
 
 Tile rendering uses device-space origin alignment and a small gutter. Display-list caching now has an approximate byte limit in addition to its entry limit. These changes do not imply full GPU PDF interpretation, pixel-identical vector antialiasing or an unmeasured speedup. See [Existing content and text boxes](docs/content-editing.md) for supported units, bounds, font/layout limits and the distinction between visual clipping and actual redaction.
+
+## Appearance and image editing
+
+The shared Edit inspector now changes native text/path colors, local stroke width/cap/join/dashes, path painting, opacity and blend mode. Text keeps its original fonts and positioning; following objects retain their prior graphics state. Image replacement changes one invocation without overwriting images shared by other pages. Static image authoring handles sRGB/straight-alpha soft masks and all eight EXIF orientations. Image interpolation is editable and honored by the corrected rendering adapter.
+
+Revisions, input validation, pixel budgets and undo apply to these operations. Zero opacity and clipping are not redaction. See [Appearance and images](docs/content-appearance.md) for exact alpha semantics, resource isolation, renderer-source provenance and remaining graphics/color-management boundaries.

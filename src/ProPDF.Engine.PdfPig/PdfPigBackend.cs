@@ -4,7 +4,7 @@ using ProPDF.Core;
 using ProPDF.Rendering.Skia;
 using SkiaSharp;
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Rendering.Skia;
+using ProPDF.Engine.PdfPig.Compatibility;
 using PigDocument = UglyToad.PdfPig.PdfDocument;
 
 namespace ProPDF.Engine.PdfPig;
@@ -130,7 +130,7 @@ public sealed class PdfPigBackend : IPdfDocumentLoader, IPdfTextService, ISkiaPd
         public SKPicture RecordPage(int pageNumber, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var picture = _document.GetPage<SKPicture>(pageNumber);
+            var picture = _document.GetPageAsSKPicture(pageNumber, cancellationToken);
             if (cancellationToken.IsCancellationRequested)
             {
                 picture.Dispose();

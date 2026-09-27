@@ -100,7 +100,7 @@ public sealed partial class ManagedPdfEditor : IPdfEditor, IPdfDocumentInspector
             case PdfContentObjectEdit edit: EditContentObject(graph, edit, token); break;
             case AddTextBox textBox: graph.Append(graph.Page(textBox.PageNumber), CreateTextBox(graph, textBox, token)); break;
             case AddText text: InsertText(graph, text); break;
-            case AddImage image: InsertImage(graph, image); break;
+            case AddImage image: InsertImage(graph, image, token); break;
             case AddShape shape: InsertShape(graph, shape); break;
             case AddAnnotation annotation: InsertAnnotation(graph, annotation); break;
             case AddInkAnnotation ink: InsertInk(graph, ink); break;
