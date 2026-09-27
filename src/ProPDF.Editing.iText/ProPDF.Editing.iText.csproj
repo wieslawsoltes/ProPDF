@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Optional iText PDF editing, AcroForms, pdfSweep redaction and digital-signature services. Dependencies require AGPL compliance or commercial iText licensing.</Description>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Core/ProPDF.Core.csproj" />
+    <PackageReference Include="itext" />
+    <!-- Upstream pdfSweep 5.0.7 publishes net461 only. This exception is package-scoped;
+         cross-platform integration tests gate the compatibility-mode code paths we use.
+         See docs/dependency-compatibility.md. All other warnings remain errors. -->
+    <PackageReference Include="itext.pdfsweep" NoWarn="NU1701" />
+    <PackageReference Include="itext.bouncy-castle-adapter" />
+    <None Include="LICENSE-NOTICE.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>
