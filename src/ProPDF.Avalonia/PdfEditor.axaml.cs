@@ -5,11 +5,11 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using ProPDF.Core;
 using ProPDF.Presentation;
 
 namespace ProPDF.Avalonia;
 
-/// <summary>Ready-to-host editor shell. Core workflows and command state live in ProPDF.Presentation.</summary>
 public sealed partial class PdfEditor : UserControl
 {
     public static readonly StyledProperty<PdfEditorContext?> ContextProperty = AvaloniaProperty.Register<PdfEditor, PdfEditorContext?>(nameof(Context));
@@ -19,6 +19,7 @@ public sealed partial class PdfEditor : UserControl
     {
         AvaloniaXamlLoader.Load(this);
         PdfOutputToolbar.Install(this);
+        PdfNavigationPanel.Install(this);
     }
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -42,9 +43,9 @@ public sealed partial class PdfEditor : UserControl
         base.OnDetachedFromVisualTree(e);
     }
 
-    private sealed class Dialogs(PdfEditor owner) : IPdfWorkspaceDialogs
+    private sealed class Dialogs(PdfEditor owner) : IPdfWorkspaceDialogs, IPdfExternalNavigation
     {
-        private TopLevel Top => TopLevel.GetTopLevel(owner) ?? throw new InvalidOperationException("The editor must be attached to a window before opening dialogs.");
+        private TopLevel Top => TopLevel.GetTopLevel(owner) ?? throw new InvalidOperationException("Attach the editor to a window before opening dialogs.");
         public async Task<string?> PickOpenPathAsync(PdfFileKind kind, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -58,7 +59,7 @@ public sealed partial class PdfEditor : UserControl
             if (files.Count == 0) return null;
             using var file = files[0];
             cancellationToken.ThrowIfCancellationRequested();
-            return file.TryGetLocalPath() ?? throw new NotSupportedException("This desktop editor currently requires local filesystem paths.");
+            return file.TryGetLocalPath() ?? throw new NotSupportedException("This editor requires local filesystem paths.");
         }
         public async Task<string?> PickSavePathAsync(string suggestedName, CancellationToken cancellationToken)
         {
@@ -98,6 +99,13 @@ public sealed partial class PdfEditor : UserControl
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (Top.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
+        }
+        public Task OpenUriAsync(Uri uri, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!PdfUriPolicy.TryNormalize(uri.AbsoluteUri, out var safe)) throw new InvalidOperationException("URI blocked by the document navigation policy.");
+            using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(safe!.AbsoluteUri) { UseShellExecute = true });
+            return Task.CompletedTask;
         }
     }
 }

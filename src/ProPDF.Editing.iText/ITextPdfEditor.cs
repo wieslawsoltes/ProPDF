@@ -12,7 +12,7 @@ namespace ProPDF.Editing.iText;
 
 public sealed record ITextEditorOptions(long MaximumOutputBytes = 256L * 1024 * 1024, int MaximumPages = 100_000);
 
-/// <summary>Native PDF editing backend. Every transaction is rewritten, reopened and validated before publication.</summary>
+/// <summary>Native PDF editing backend. Transactions are rewritten, reopened and validated before publication.</summary>
 public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
 {
     private readonly IPdfDocumentLoader _validator;
@@ -35,8 +35,10 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
     public async Task<PdfSnapshot> ApplyAsync(PdfSnapshot source, IReadOnlyList<IPdfEditOperation> operations, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(operations);
         var batch = operations.ToArray();
         if (batch.Length == 0) return source;
+        if (batch.Length > 100_000) throw new ArgumentOutOfRangeException(nameof(operations));
         if (batch.Any(operation => operation is null || !Capabilities.Contains(operation.Capability)))
             throw new NotSupportedException("The transaction contains an unsupported operation.");
         var encryptionChanges = batch.OfType<ChangeEncryption>().ToArray();
@@ -66,7 +68,6 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
         if (encryption is null) stamping.PreserveEncryption();
         using (var document = new PdfDocument(reader, writer, stamping))
         {
-            // Never bypass owner permissions and never silently invalidate existing signatures.
             if (!reader.IsOpenedWithFullPermission()) throw new UnauthorizedAccessException("Editing requires the PDF owner password.");
             if (new SignatureUtil(document).GetSignatureNames().Count != 0)
                 throw new NotSupportedException("This document is signed. Rewriting it would invalidate signatures. Use the separate append-mode signing service or edit an unsigned original.");
@@ -87,6 +88,8 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
     {
         switch (operation)
         {
+            case PdfOutlineEdit outline: ApplyOutlineEdit(document, outline, cancellationToken); break;
+            case AddInternalLink link: InsertInternalLink(document, link); break;
             case RotatePage rotate:
                 if (rotate.ClockwiseDegrees % 90 != 0) throw new ArgumentException("Rotation must be a multiple of 90 degrees.");
                 var page = GetPage(document, rotate.PageNumber);
@@ -105,6 +108,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
                 break;
             case InsertBlankPage insert:
                 ValidateInsertion(document, insert.BeforePage);
+                if (insert.Size.Width <= 0 || insert.Size.Height <= 0) throw new ArgumentOutOfRangeException(nameof(insert.Size));
                 document.AddNewPage(insert.BeforePage, new PageSize((float)insert.Size.Width, (float)insert.Size.Height));
                 break;
             case CropPage crop:
@@ -120,8 +124,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
                 using (var stream = insert.Document.OpenRead())
                 using (var other = new PdfDocument(CreateReader(stream, insert.Document.GetPassword())))
                 {
-                    if (!other.GetReader().IsOpenedWithFullPermission())
-                        throw new UnauthorizedAccessException("Importing pages requires owner-authorized access.");
+                    if (!other.GetReader().IsOpenedWithFullPermission()) throw new UnauthorizedAccessException("Importing pages requires owner-authorized access.");
                     other.CopyPagesTo(insert.Pages.ToList(), document, insert.BeforePage, new PdfPageFormCopier());
                 }
                 break;
@@ -158,13 +161,11 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
             case RedactRegion redaction: ApplyRedaction(document, redaction, cancellationToken); break;
             case ReplaceRegionText replace:
                 ApplyRedaction(document, new RedactRegion(replace.PageNumber, replace.Bounds, PdfColor.White), cancellationToken);
-                InsertText(document, new AddText(replace.PageNumber,
-                    new PdfPoint(replace.Bounds.X + 2, replace.Bounds.Y + replace.FontSize + 2), replace.Text,
-                    replace.FontSize, EmbeddedFont: replace.EmbeddedFont));
+                InsertText(document, new AddText(replace.PageNumber, new PdfPoint(replace.Bounds.X + 2, replace.Bounds.Y + replace.FontSize + 2),
+                    replace.Text, replace.FontSize, EmbeddedFont: replace.EmbeddedFont));
                 break;
             case SetDocumentMetadata metadata:
-                var info = document.GetDocumentInfo();
-                info.SetTitle(metadata.Metadata.Title).SetAuthor(metadata.Metadata.Author)
+                document.GetDocumentInfo().SetTitle(metadata.Metadata.Title).SetAuthor(metadata.Metadata.Author)
                     .SetSubject(metadata.Metadata.Subject).SetKeywords(metadata.Metadata.Keywords);
                 break;
             case AddAttachment attachment:
@@ -189,7 +190,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
                 if (bookmark.RootIndex < 0 || bookmark.RootIndex >= children.Count) throw new ArgumentOutOfRangeException(nameof(bookmark.RootIndex));
                 children[bookmark.RootIndex].RemoveOutline();
                 break;
-            case ChangeEncryption: break; // Writer configuration is established before any document bytes are written.
+            case ChangeEncryption: break;
             default: throw new NotSupportedException($"Unsupported operation: {operation.GetType().Name}");
         }
     }
@@ -198,6 +199,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
     {
         if (pageCount < 1 || pageCount > _options.MaximumPages) throw new ArgumentOutOfRangeException(nameof(pageCount));
         var dimensions = size ?? new PdfSize(595.276, 841.89);
+        if (dimensions.Width <= 0 || dimensions.Height <= 0) throw new ArgumentOutOfRangeException(nameof(size));
         var bytes = await Task.Run(() =>
         {
             using var output = new BoundedPdfOutput(_options.MaximumOutputBytes, cancellationToken);
@@ -219,7 +221,7 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
 
     public async Task<PdfSnapshot> ExtractPagesAsync(PdfSnapshot source, IEnumerable<int> pages, CancellationToken cancellationToken = default)
     {
-        var selected = pages.ToArray();
+        var selected = pages.Take(_options.MaximumPages + 1).ToArray();
         if (selected.Length < 1 || selected.Length > _options.MaximumPages) throw new ArgumentOutOfRangeException(nameof(pages));
         foreach (var page in selected) source.GetPage(page);
         var bytes = await Task.Run(() =>
@@ -237,7 +239,6 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
             cancellationToken.ThrowIfCancellationRequested();
             return output.ToArray();
         }, cancellationToken).ConfigureAwait(false);
-        // Extraction creates a new, unsigned, unencrypted document. Source credentials are not copied to it.
         return await ValidateAsync(bytes, null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -249,29 +250,24 @@ public sealed partial class ITextPdfEditor : IPdfEditor, IPdfDocumentInspector
             Password = password, MaximumBytes = _options.MaximumOutputBytes, MaximumPages = _options.MaximumPages
         }, cancellationToken).ConfigureAwait(false);
     }
-
     internal static PdfReader CreateReader(Stream source, string? password)
     {
         var properties = new ReaderProperties();
         if (password is not null) properties.SetPassword(Encoding.UTF8.GetBytes(password));
         return new PdfReader(source, properties);
     }
-
     internal static PdfPage GetPage(PdfDocument document, int number) => number >= 1 && number <= document.GetNumberOfPages()
         ? document.GetPage(number) : throw new ArgumentOutOfRangeException(nameof(number));
-
     private static void ValidateInsertion(PdfDocument document, int number)
     {
         if (number < 1 || number > document.GetNumberOfPages() + 1) throw new ArgumentOutOfRangeException(nameof(number));
     }
-
     internal static PdfPageTransform Transform(PdfPage page)
     {
         var crop = page.GetCropBox();
         var userUnit = page.GetPdfObject().GetAsNumber(PdfName.UserUnit)?.DoubleValue() ?? 1;
         return new PdfPageTransform(new PdfRect(crop.GetX(), crop.GetY(), crop.GetWidth(), crop.GetHeight()), page.GetRotation(), userUnit);
     }
-
     internal static Rectangle ToRectangle(PdfRect bounds) => new((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height);
     private static void ValidateBounds(PdfPage page, PdfRect bounds)
     {
