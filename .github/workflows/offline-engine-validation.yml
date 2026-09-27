@@ -24,13 +24,34 @@ jobs:
           mkdir -p /tmp/cms-check
           printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.12" /></ItemGroup></Project>' > /tmp/cms-check/check.csproj
           dotnet restore /tmp/cms-check/check.csproj
-      - name: Prepare offline compiler and non-font dependency cache
+      - name: Prepare scoped offline compiler and non-font dependency cache
+        shell: python
         run: |
-          mkdir -p artifacts/offline
-          sdk=$(dotnet --version)
-          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
-          tar -czf artifacts/offline/dotnet.tar.gz --exclude='**/templates/**' -C "$root" dotnet LICENSE.txt ThirdPartyNotices.txt host shared packs "sdk/$sdk"
-          tar -czf artifacts/offline/packages.tar.gz -C "$HOME/.nuget" --exclude='packages/itext*' --exclude='packages/avalonia.fonts.*' --exclude='*.ttf' --exclude='*.otf' packages
+          import json, pathlib, shutil, subprocess, tarfile
+          out = pathlib.Path('artifacts/offline'); out.mkdir(parents=True, exist_ok=True)
+          root = pathlib.Path(shutil.which('dotnet')).resolve().parent
+          sdk = subprocess.check_output(['dotnet', '--version'], text=True).strip()
+          def latest(path, prefix):
+              return sorted((p for p in path.iterdir() if p.name.startswith(prefix)), key=lambda p: tuple(int(x) for x in p.name.split('.')))[-1]
+          paths = [root/'dotnet', root/'LICENSE.txt', root/'ThirdPartyNotices.txt', root/'sdk'/sdk,
+              latest(root/'host/fxr','10.'), latest(root/'shared/Microsoft.NETCore.App','10.'), latest(root/'shared/Microsoft.NETCore.App','8.'),
+              latest(root/'packs/Microsoft.NETCore.App.Ref','8.')]
+          with tarfile.open(out/'dotnet.tar.gz','w:gz',compresslevel=1) as archive:
+              for path in paths: archive.add(path,arcname=str(path.relative_to(root)))
+          directories = set()
+          for asset in list(pathlib.Path('.').rglob('project.assets.json')) + [pathlib.Path('/tmp/cms-check/obj/project.assets.json')]:
+              data = json.loads(asset.read_text())
+              for key, item in data['libraries'].items():
+                  if item['type'] != 'package' or key.lower().startswith(('itext','avalonia.fonts.')): continue
+                  for folder in data['packageFolders']:
+                      path = pathlib.Path(folder)/item['path']
+                      if path.exists(): directories.add(path)
+          def no_fonts(info):
+              if info.name.lower().endswith(('.ttf','.otf','.woff','.woff2')): return None
+              return info
+          with tarfile.open(out/'packages.tar.gz','w:gz',compresslevel=1) as archive:
+              for path in sorted(directories): archive.add(path,arcname='packages/'+path.parent.name+'/'+path.name,filter=no_fonts)
+          print([(p.name,p.stat().st_size) for p in out.iterdir()])
       - uses: actions/upload-artifact@v7
         with:
           name: offline-engine-toolchain
