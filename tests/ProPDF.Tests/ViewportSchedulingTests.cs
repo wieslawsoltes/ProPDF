@@ -57,14 +57,44 @@ public sealed class ViewportSchedulingTests
     {
         var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend); var session = new PdfSession(backend, editor);
         await using var renderer = new SkiaPdfRenderer(backend);
-        await using var viewport = new PdfViewportController(session, renderer, backend);
+        // Observe publications synchronously. xUnit's ambient context may
+        // defer/coalesce notifications past the renderer completion await, which
+        // would make this ownership test depend on unrelated dispatcher timing.
+        // The queued-dispatcher contract is verified separately below.
+        await using var viewport = new PdfViewportController(session, renderer, backend, action => action());
         viewport.SetViewport(900, 700); await OpenAsync(session, editor); await viewport.WaitForRenderingAsync();
         using var first = viewport.CaptureScene(); Assert.Equal(4, first.TileCount);
         var publications = new ConcurrentBag<int>();
         viewport.Invalidated += (_, _) => { using var scene = viewport.CaptureScene(); publications.Add(scene.TileCount); };
         viewport.ScrollBy(200, 0); await viewport.WaitForRenderingAsync();
         using var final = viewport.CaptureScene(); Assert.Equal(6, final.TileCount);
-        Assert.NotEmpty(publications); Assert.All(publications, count => Assert.True(count >= 4, $"Progressive publication dropped to {count} tiles."));
+        Assert.NotEmpty(publications); Assert.Contains(6, publications);
+        Assert.All(publications, count => Assert.True(count >= 4, $"Progressive publication dropped to {count} tiles."));
+    }
+
+    [Fact]
+    public async Task RenderingCompletionDoesNotRequireTheHostToDrainQueuedNotifications()
+    {
+        var queue = new ConcurrentQueue<Action>();
+        var backend = new PdfPigBackend(); var editor = new ManagedPdfEditor(backend); var session = new PdfSession(backend, editor);
+        await using var renderer = new SkiaPdfRenderer(backend);
+        await using var viewport = new PdfViewportController(session, renderer, backend, queue.Enqueue);
+        viewport.SetViewport(900, 700); await OpenAsync(session, editor);
+        await viewport.WaitForRenderingAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        // Rendering can complete while a host intentionally holds its UI queue.
+        Assert.Single(queue);
+        Assert.True(queue.TryDequeue(out var initial)); initial();
+        Assert.Empty(queue);
+        using var first = viewport.CaptureScene(); Assert.Equal(4, first.TileCount);
+
+        var publications = new List<int>();
+        viewport.Invalidated += (_, _) => { using var scene = viewport.CaptureScene(); publications.Add(scene.TileCount); };
+        viewport.ScrollBy(200, 0);
+        await viewport.WaitForRenderingAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var rendered = viewport.CaptureScene(); Assert.Equal(6, rendered.TileCount);
+        Assert.Empty(publications); Assert.Single(queue);
+        Assert.True(queue.TryDequeue(out var publish)); publish();
+        Assert.Equal(new[] { 6 }, publications); Assert.Empty(queue);
     }
 
     [Fact]
