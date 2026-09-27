@@ -15,7 +15,7 @@ class RendererSourceTests(unittest.TestCase):
         files = {"LICENSE.txt": "Apache License\n", "NOTICE.txt": "Upstream notices\n",
                  "Renderer.cs": "// Apache License\n// Modified by ProPDF\n"}
         for name, text in files.items():
-            (directory / name).write_text(text, encoding="utf-8")
+            (directory / name).write_bytes(text.encode("utf-8"))
         manifest = {"commit": module.PIN, "repository": module.REPOSITORY, "license": "Apache-2.0", "files": [
             {"path": name, "upstream_sha256": "0" * 64, "vendored_sha256": module.canonical_hash(directory / name)} for name in files]}
         (directory / "PROVENANCE.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -27,8 +27,16 @@ class RendererSourceTests(unittest.TestCase):
             root = self.fixture(work)
             self.assertEqual(3, module.verify(root))
             source = root / "Renderer.cs"
-            source.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
+            source.write_bytes(source.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
             self.assertEqual(3, module.verify(root))
+
+    def test_doubled_carriage_returns_are_content_changes(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = self.fixture(work)
+            source = root / "Renderer.cs"
+            source.write_bytes(source.read_bytes().replace(b"\n", b"\r\r\n"))
+            with self.assertRaisesRegex(ValueError, "hash mismatch"):
+                module.verify(root)
 
     def test_modified_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as work:
