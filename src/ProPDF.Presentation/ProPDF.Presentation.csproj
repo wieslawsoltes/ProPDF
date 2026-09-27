@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Shared PDF viewport, interaction tools, search navigation and immutable Skia scenes for native UI adapters.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Core/ProPDF.Core.csproj" />
+    <ProjectReference Include="../ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
+  </ItemGroup>
+</Project>

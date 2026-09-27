@@ -4,8 +4,18 @@
     <Project Path="src/ProPDF.Rendering.Skia/ProPDF.Rendering.Skia.csproj" />
     <Project Path="src/ProPDF.Engine.PdfPig/ProPDF.Engine.PdfPig.csproj" />
     <Project Path="src/ProPDF.Editing.iText/ProPDF.Editing.iText.csproj" />
+    <Project Path="src/ProPDF.Presentation/ProPDF.Presentation.csproj" />
+    <Project Path="src/ProPDF.Avalonia/ProPDF.Avalonia.csproj" />
+    <Project Path="src/ProPDF.Wpf/ProPDF.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
+    <Project Path="samples/ProPDF.Avalonia.Sample/ProPDF.Avalonia.Sample.csproj" />
+    <Project Path="samples/ProPDF.Wpf.Sample/ProPDF.Wpf.Sample.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProPDF.Tests/ProPDF.Tests.csproj" />
+    <Project Path="tests/ProPDF.Avalonia.Smoke/ProPDF.Avalonia.Smoke.csproj" />
+    <Project Path="tests/ProPDF.Wpf.Smoke/ProPDF.Wpf.Smoke.csproj" />
   </Folder>
 </Solution>
