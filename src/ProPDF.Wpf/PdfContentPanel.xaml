@@ -16,7 +16,7 @@
   <Button x:Name="ApplyObjectBoundsButton" Content="Apply position / size" Command="{Binding ApplyObjectBoundsCommand}"/>
   <WrapPanel><Button Content="Rotate 90°" Command="{Binding RotateObjectCommand}"/><Button Content="Flip" Command="{Binding FlipObjectCommand}"/></WrapPanel>
   <WrapPanel><Button Content="Duplicate" Command="{Binding DuplicateObjectCommand}"/><Button Content="Delete" Command="{Binding DeleteObjectCommand}"/></WrapPanel>
-  <Expander Header="ALIGN AND DISTRIBUTE" Margin="0,8,0,0">
+  <Expander Header="ALIGN / SPACE" Margin="0,8,0,0">
     <StackPanel>
       <TextBlock Text="Uses approximate selection bounds. The first/last objects stay fixed during distribution." FontSize="11" TextWrapping="Wrap" Margin="0,4"/>
       <ComboBox ItemsSource="{Binding ContentAlignments}" SelectedItem="{Binding ContentAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
