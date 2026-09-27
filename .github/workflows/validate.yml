@@ -1,0 +1,56 @@
+name: Reusable validation
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: '0.1.0-alpha.1'
+      artifact-prefix:
+        type: string
+        default: validation
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PACKAGE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: |
+            10.0.x
+            8.0.x
+      - name: Restore
+        run: dotnet restore ProPDF.slnx
+      - name: Build libraries and native applications
+        shell: pwsh
+        run: dotnet build ProPDF.slnx -c Release --no-restore "-p:Version=$env:PACKAGE_VERSION"
+      - name: Headless engine, editing and viewport regression tests
+        run: dotnet test tests/ProPDF.Tests -c Release --no-build --logger trx --results-directory artifacts/tests --collect:"XPlat Code Coverage"
+      - name: Avalonia real-Skia headless editor validation
+        run: dotnet run --project tests/ProPDF.Avalonia.Smoke -c Release --no-build -- artifacts/headless/avalonia.png
+      - name: WPF software-rendered editor validation
+        if: runner.os == 'Windows'
+        run: dotnet run --project tests/ProPDF.Wpf.Smoke -c Release --no-build -- artifacts/headless/wpf.png
+      - name: Pack standalone libraries
+        shell: pwsh
+        run: dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages "-p:Version=$env:PACKAGE_VERSION"
+      - name: External NuGet consumers
+        shell: pwsh
+        run: ./scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ inputs.artifact-prefix }}-${{ matrix.os }}
+          path: artifacts/
+          if-no-files-found: warn

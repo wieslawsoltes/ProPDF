@@ -1,0 +1,42 @@
+site_name: ProPDF
+site_description: Modular .NET PDF viewing and editing with SkiaSharp, Avalonia and WPF.
+site_url: https://wieslawsoltes.github.io/ProPDF/
+repo_url: https://github.com/wieslawsoltes/ProPDF
+repo_name: wieslawsoltes/ProPDF
+site_dir: artifacts/site
+theme:
+  name: material
+  font: false
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+plugins:
+  - search
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+nav:
+  - Overview: index.md
+  - Getting started: getting-started.md
+  - Feature matrix: features.md
+  - Native editing: editing.md
+  - Delivery: build-release.md
+  - Licensing: licensing.md
+  - Dependency compatibility: dependency-compatibility.md

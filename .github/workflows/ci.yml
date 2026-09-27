@@ -7,39 +7,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  validate:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - name: Restore
-        run: dotnet restore ProPDF.slnx
-      - name: Build libraries and native applications
-        run: dotnet build ProPDF.slnx -c Release --no-restore
-      - name: Headless engine and rendering tests
-        run: dotnet test tests/ProPDF.Tests -c Release --no-build --logger trx --results-directory artifacts/tests --collect:"XPlat Code Coverage"
-      - name: Avalonia real-Skia headless editor validation
-        run: dotnet run --project tests/ProPDF.Avalonia.Smoke -c Release --no-build -- artifacts/headless/avalonia.png
-      - name: WPF software-rendered editor validation
-        if: runner.os == 'Windows'
-        run: dotnet run --project tests/ProPDF.Wpf.Smoke -c Release --no-build -- artifacts/headless/wpf.png
-      - name: Pack standalone libraries
-        run: dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: validation-${{ matrix.os }}
-          path: artifacts/
-          if-no-files-found: warn
+  validation:
+    uses: ./.github/workflows/validate.yml

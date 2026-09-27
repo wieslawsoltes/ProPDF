@@ -1,52 +1,93 @@
 # ProPDF
 
-**One document engine. Two native desktop experiences.**
+### One PDF engine. Two native desktop experiences.
 
-ProPDF is a modular .NET PDF toolkit for building an Avalonia or WPF viewer and editor around shared SkiaSharp rendering. The project is in **0.1.0-alpha.1 development**; it is not a claim of complete Adobe Acrobat compatibility.
+Modular .NET PDF viewing and editing with **SkiaSharp**, **Avalonia** and **WPF**.
 
-## Design
+[Getting started](docs/getting-started.md) · [Architecture](docs/index.md) · [Feature matrix](docs/features.md) · [Native editing](docs/editing.md) · [Build and release](docs/build-release.md) · [Licensing](docs/licensing.md)
+
+**Development alpha: 0.1.0-alpha.1.** This is not yet full Adobe Acrobat parity or a certified redaction/signature-trust product. The feature matrix separates executable SDK functionality, native desktop workflows and remaining work.
+
+## Seven reusable packages
 
 | Package | Responsibility |
 | --- | --- |
-| `ProPDF.Core` | Immutable snapshots, transactions, revision checks, bounded undo/redo, atomic saves, geometry and virtualized page layout |
-| `ProPDF.Rendering.Skia` | Clipped tile rendering, bounded image and display-list caches, reference-counted native resources |
-| `ProPDF.Engine.PdfPig` | PDF loading, lightweight page geometry, text extraction/search, Skia display-list creation |
+| `ProPDF.Core` | Immutable snapshots, transactions, revisions, bounded undo, atomic saving, geometry and layout |
+| `ProPDF.Rendering.Skia` | Background tile rendering, display-list caches and reference-counted native images |
+| `ProPDF.Engine.PdfPig` | Parsing, text extraction/search and PDF-to-Skia interpretation |
+| `ProPDF.Editing.iText` | Optional native editing, forms, annotations, redaction, encryption and signing |
+| `ProPDF.Presentation` | Shared viewport, interactions, workspace commands and inspector state |
+| `ProPDF.Avalonia` | Native viewer, thumbnail and editor controls |
+| `ProPDF.Wpf` | Equivalent Windows WPF controls |
 
-No UI framework is referenced by these libraries. Rendering is scheduled away from the UI thread, and a PDF document is never accessed concurrently by the rendering worker. Only requested page tiles are rasterized.
+UI packages have no iText dependency. Applications opt into an editing backend; a viewer-only host uses `new PdfSession(backend)`.
 
-## Build and test
+## Build and run
 
-Install the .NET 10 SDK (the libraries target .NET 8):
+Install the .NET 10 SDK. Libraries/apps target .NET 8; WPF executes only on Windows but cross-builds on all CI hosts.
 
 ```sh
+git clone https://github.com/wieslawsoltes/ProPDF.git
+cd ProPDF
 dotnet restore ProPDF.slnx
 dotnet build ProPDF.slnx -c Release --no-restore
-dotnet test tests/ProPDF.Tests -c Release --no-build
-dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages
+dotnet run --project samples/ProPDF.Avalonia.Sample -c Release --no-build
+# Windows alternative:
+dotnet run --project samples/ProPDF.Wpf.Sample -c Release --no-build
 ```
 
-GitHub Actions validates Linux, Windows and macOS and uploads test results and NuGet artifacts. Artifacts are not a published NuGet release.
+Samples generate a real PDF with text, vectors, comments, a form and bookmarks. No confidential documents, private keys or font files are bundled.
 
-## Safety and lifecycle
+## Integrate
 
-Document snapshots own immutable bytes. An edit becomes visible only after the edited PDF has been reopened successfully. Failed and cancelled edits leave the current snapshot unchanged. Save uses a same-directory temporary file, flushes it, then replaces the destination; a cancelled write never truncates the original file. Undo history has both byte and entry limits.
+```csharp
+using ProPDF.Core;
+using ProPDF.Engine.PdfPig;
+using ProPDF.Editing.iText;
+using ProPDF.Presentation;
+using ProPDF.Rendering.Skia;
 
-PDF input is untrusted. Input size, page count, tile size, search result count and regex execution are bounded. In-process parsing is **not a sandbox**; applications handling hostile files should run it in a restricted worker process. PDF JavaScript, launch actions and network fetches are not executed by ProPDF.
+var backend = new PdfPigBackend();
+var editor = new ITextPdfEditor(backend); // Optional; review licensing.
+var session = new PdfSession(backend, editor);
+var renderer = new SkiaPdfRenderer(backend);
+var viewport = new PdfViewportController(session, renderer, backend);
+var context = new PdfEditorContext(viewport, editor,
+    token => editor.CreateAsync(cancellationToken: token), backend);
+// new ProPDF.Avalonia.PdfEditor { Context = context };
+// new ProPDF.Wpf.PdfEditor { Context = context };
 
-Native image leases must be disposed. Evicting a cache entry never invalidates a lease that is still being displayed. Renderer disposal waits for the active worker; outstanding image leases remain valid until released.
+await using var input = File.OpenRead("input.pdf");
+await session.OpenAsync(input);
+await session.ApplyAsync(new AddText(1, new PdfPoint(40, 60), "Reviewed"), session.Current!.Id);
+await session.SaveAsAsync("reviewed.pdf");
+```
 
-## Engine selection and licensing
+Create controls on the UI thread and supply a dispatcher when no UI synchronization context exists. Each window needs a separate viewport. Detach views before awaiting viewport and renderer disposal. Dispose all acquired scenes and tile leases.
 
-PdfPig and PdfPig.Rendering.Skia provide Apache-2.0-licensed parsing/rendering integration; SkiaSharp is MIT licensed. A separate iText editing adapter is planned in the next feature PR to supply document manipulation, forms and real content redaction. That adapter and the assembled editor applications require **AGPL compliance or an appropriate commercial iText license**. It will not be a transitive dependency of the reusable UI controls.
+## Rendering and editing
 
-Upstream references: [PdfPig](https://github.com/UglyToad/PdfPig), [PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia), [SkiaSharp](https://github.com/mono/SkiaSharp), [iText licensing](https://itextpdf.com/how-buy/AGPLv3-license).
+Virtualized layout requests visible 512-pixel tiles with progressive publication, cached display lists and stale-generation rejection. Rasterization is CPU Skia; Avalonia may GPU-compose tiles and WPF uses a reusable premultiplied bitmap. No unmeasured speedup over Acrobat is claimed.
 
-## Compatibility
+Native changes include page organization, content insertion, regional replacement, annotations, AcroForms, metadata, attachments and bookmarks. Edits are independently reopened before publishing an immutable revision. Atomic saves flush a temporary file before replacement. Region replacement is not paragraph reflow.
 
-PDF rendering depends on the upstream interpreter and font availability. Passing the test suite is not ISO 32000, PDF/A, PDF/UA or Acrobat certification. Dedicated interoperability fixtures, native UI checks and performance qualification are required before a production release.
+Redaction removes page content rather than painting over it, but is not certified full-file sanitization. Tagged PDFs and intersecting unflattened widgets are blocked; original files and undo history remain unredacted. Cryptographic signature integrity does not prove certificate trust, revocation or legal identity. Hostile PDFs require process isolation; in-process parsing is not a sandbox.
 
-## Contributing
+## Validation and delivery
 
-Use focused feature branches and include regression tests. Keep framework-specific code in adapters, preserve cancellation and resource ownership, and never advertise an unsupported capability. Do not commit confidential PDFs, private keys, licenses or font files.
+```sh
+dotnet test tests/ProPDF.Tests -c Release --no-build
+dotnet run --project tests/ProPDF.Avalonia.Smoke -c Release --no-build
+# Windows only:
+dotnet run --project tests/ProPDF.Wpf.Smoke -c Release --no-build
+dotnet pack ProPDF.slnx -c Release --no-build -o artifacts/packages
+pwsh scripts/verify-packages.ps1 -PackageDirectory artifacts/packages
+python -m pip install -r docs/requirements.txt
+python -m mkdocs build --strict
+```
 
-ProPDF-authored foundation code is licensed under MIT; third-party and optional adapter licensing must also be respected.
+CI validates Linux, Windows and macOS, independently reopened edits, native UI screenshots and clean external NuGet consumers. Release workflows reuse those checks, require exact tags reachable from main, and produce source, package and sample archives with checksums. Configure `NUGET_API_KEY` in a protected `nuget-release` environment for publication; configure Pages to use GitHub Actions. Workflow presence does not mean a public release or deployment has occurred.
+
+## Licensing
+
+ProPDF-authored source is MIT. PdfPig and its Skia integration are Apache-2.0; SkiaSharp is MIT. **iText and pdfSweep require AGPL compliance or appropriate commercial licenses.** The adapter's MIT license does not override these dependencies. pdfSweep's package-scoped framework-compatibility exception is documented separately.
