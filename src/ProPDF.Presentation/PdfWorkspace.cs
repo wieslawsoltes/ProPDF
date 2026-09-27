@@ -4,8 +4,8 @@ using ProPDF.Core;
 
 namespace ProPDF.Presentation;
 
-/// <summary>Shared editor-shell view model. File dialogs are injected; all editing commands and state are reused across WPF and Avalonia.</summary>
-public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
+/// <summary>Shared editor-shell view model. Bind and invoke commands on the host UI thread; notifications always use its dispatcher.</summary>
+public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
 {
     private readonly PdfEditorContext _context;
     private readonly IPdfWorkspaceDialogs _dialogs;
@@ -15,8 +15,9 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
     private Guid? _knownRevision;
     private Guid? _inspectionRevision;
     private int _refreshQueued;
-    private bool _disposed;
-    private bool _busy;
+    private int _reportedPage;
+    private volatile bool _disposed;
+    private volatile bool _busy;
     private string _searchQuery = "";
     private string _pageInput = "1";
     private string _fieldValue = "";
@@ -46,7 +47,8 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
         NextPageCommand = Action(() => Viewport.GoToPage(Math.Min(Viewport.PageCount, Viewport.CurrentPage + 1)), HasDocument);
         GoToPageCommand = Action(() =>
         {
-            if (!int.TryParse(PageInput, out var number) || number < 1 || number > Viewport.PageCount) throw new ArgumentException("Enter a valid page number.");
+            if (!int.TryParse(PageInput, out var number) || number < 1 || number > Viewport.PageCount)
+                throw new ArgumentException("Enter a valid page number.");
             Viewport.GoToPage(number);
         }, HasDocument);
         ZoomInCommand = Action(() => Viewport.SetZoom(Viewport.Zoom * 1.15));
@@ -79,7 +81,7 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
         ExtractPageCommand = Command(ExtractPageAsync, () => HasDocument() && _context.PageExtractor is not null);
         ApplyRedactionsCommand = Command(async token =>
         {
-            if (await _dialogs.ConfirmAsync("Apply content redactions", "Remove page content in every marked region? The saved output will contain the removal, but the original file and undo history remain unredacted. Metadata, attachments and other pages need separate review. This alpha is not a certified sanitization tool.", token))
+            if (await _dialogs.ConfirmAsync("Apply content redactions", "Remove page content in every marked region? Original files and undo history remain unredacted. Metadata, attachments and other pages need separate review. This alpha is not a certified sanitization tool.", token))
                 await Viewport.ApplyRedactionsAsync(token);
         }, () => Can(PdfCapability.Redaction) && Viewport.PendingRedactions > 0);
         ClearRedactionsCommand = Action(Viewport.ClearRedactions, () => Viewport.PendingRedactions > 0);
@@ -91,7 +93,7 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
         FlattenFormsCommand = Command(async token =>
         {
             var revision = Document!.Id;
-            if (await _dialogs.ConfirmAsync("Flatten forms", "Convert form widgets into static page content? Fields will no longer be editable in the saved PDF.", token))
+            if (await _dialogs.ConfirmAsync("Flatten forms", "Convert fields to static content? Fields will no longer be editable in the saved PDF.", token))
                 await Session.ApplyAsync(new FlattenForms(), revision, token);
         }, () => Can(PdfCapability.Forms) && Fields.Count > 0);
         SaveMetadataCommand = Edit(() => new SetDocumentMetadata(new PdfMetadata(DocumentTitle, DocumentAuthor, DocumentSubject, DocumentKeywords)), PdfCapability.Metadata);
@@ -122,7 +124,7 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
     public IReadOnlyList<PdfBookmarkInfo> Bookmarks { get; private set; } = Array.Empty<PdfBookmarkInfo>();
     public string SearchQuery { get => _searchQuery; set => Set(ref _searchQuery, value ?? ""); }
     public string PageInput { get => _pageInput; set => Set(ref _pageInput, value ?? ""); }
-    public string ToolText { get => Viewport.ToolText; set { Viewport.ToolText = value ?? ""; Changed(); } }
+    public string ToolText { get => Viewport.ToolText; set { if (Viewport.ToolText != value) { Viewport.ToolText = value ?? ""; Changed(); } } }
     public string FieldValue { get => _fieldValue; set => Set(ref _fieldValue, value ?? ""); }
     public string Comment { get => _comment; set => Set(ref _comment, value ?? ""); }
     public string DocumentTitle { get => _title; set => Set(ref _title, value ?? ""); }
@@ -130,12 +132,12 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
     public string DocumentSubject { get => _subject; set => Set(ref _subject, value ?? ""); }
     public string DocumentKeywords { get => _keywords; set => Set(ref _keywords, value ?? ""); }
     public PdfLayoutMode[] LayoutModes { get; } = Enum.GetValues<PdfLayoutMode>();
-    public PdfLayoutMode LayoutMode { get => Viewport.LayoutMode; set { Viewport.SetLayoutMode(value); Changed(); } }
+    public PdfLayoutMode LayoutMode { get => Viewport.LayoutMode; set { if (Viewport.LayoutMode != value) { Viewport.SetLayoutMode(value); Changed(); } } }
     public IReadOnlyList<PdfToolDescriptor> Tools => AllTools.Where(item => Available(item.Tool)).ToArray();
     public PdfToolDescriptor? SelectedTool
     {
         get => AllTools.FirstOrDefault(item => item.Tool == Viewport.Tool);
-        set { if (value is not null && Available(value.Tool)) Viewport.Tool = value.Tool; Changed(); }
+        set { if (value is not null && value.Tool != Viewport.Tool && Available(value.Tool)) { Viewport.Tool = value.Tool; Changed(); } }
     }
     public PdfPageInfo? SelectedPage
     {
@@ -218,16 +220,21 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
         if (_disposed || _busy) return;
         _busy = true;
         var token = _lifetime.Token;
-        Changed(null); RefreshCommands();
+        Changed(null);
+        RefreshCommands();
         try { await action(token); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error) { if (!_disposed) Viewport.ReportError(error); }
-        finally { _busy = false; if (!_disposed) { Changed(null); RefreshCommands(); } }
+        finally
+        {
+            _busy = false;
+            if (!_disposed) { Changed(null); RefreshCommands(); }
+        }
     }
 
     public async Task<bool> ConfirmDiscardAsync(CancellationToken cancellationToken = default) =>
         (!Session.IsDirty && Viewport.PendingRedactions == 0) || await _dialogs.ConfirmAsync("Unsaved work",
-            "Discard unsaved edits and unapplied redaction marks? Save your document first to retain edits.", cancellationToken);
+            "Discard unsaved edits and unapplied redaction marks? Save first to retain edits.", cancellationToken);
 
     private async Task OpenAsync(bool protectedDocument, CancellationToken token)
     {
@@ -243,6 +250,7 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
         if (Viewport.PendingRedactions != 0) throw new InvalidOperationException("Apply or clear redaction marks before saving. Marks alone do not redact a PDF.");
         var path = !saveAs ? Session.FilePath : null;
         path ??= await _dialogs.PickSavePathAsync(Session.FilePath is { } existing ? Path.GetFileName(existing) : "document.pdf", token);
+        if (Viewport.PendingRedactions != 0) throw new InvalidOperationException("Redaction marks were added while the save dialog was open. Apply or clear them first.");
         if (path is not null) await Session.SaveAsAsync(path, token);
     }
     private async Task InsertImageAsync(CancellationToken token)
@@ -323,13 +331,23 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
             _author = document?.Metadata.Author ?? "";
             _subject = document?.Metadata.Subject ?? "";
             _keywords = document?.Metadata.Keywords ?? "";
-            _selectedAnnotation = null; _selectedField = null; _selectedAttachment = null;
-            Annotations = Array.Empty<PdfAnnotationInfo>(); Fields = Array.Empty<PdfFormFieldInfo>();
-            Attachments = Array.Empty<PdfAttachmentInfo>(); Bookmarks = Array.Empty<PdfBookmarkInfo>();
+            _selectedAnnotation = null;
+            _selectedField = null;
+            _selectedAttachment = null;
+            Annotations = Array.Empty<PdfAnnotationInfo>();
+            Fields = Array.Empty<PdfFormFieldInfo>();
+            Attachments = Array.Empty<PdfAttachmentInfo>();
+            Bookmarks = Array.Empty<PdfBookmarkInfo>();
             if (document is not null && _context.Inspector is not null) _ = LoadInspectionAsync(document, _lifetime.Token);
         }
-        _selectedPage = document is not null ? document.GetPage(Viewport.CurrentPage) : null;
-        _pageInput = Viewport.CurrentPage.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var page = Math.Clamp(Viewport.CurrentPage, 1, Math.Max(1, document?.Pages.Count ?? 1));
+        _selectedPage = document?.GetPage(page);
+        // Progressive tile updates must not overwrite a page number the user is currently typing.
+        if (_reportedPage != page)
+        {
+            _reportedPage = page;
+            _pageInput = page.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
         Changed(null);
         RefreshCommands();
     }
@@ -343,13 +361,16 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
             {
                 if (_disposed || Document?.Id != document.Id) return;
                 Annotations = inspection.Annotations.Where(annotation => annotation.Kind != "Widget").ToArray();
-                Fields = inspection.Fields; Attachments = inspection.Attachments; Bookmarks = inspection.Bookmarks;
+                Fields = inspection.Fields;
+                Attachments = inspection.Attachments;
+                Bookmarks = inspection.Bookmarks;
                 _inspectionRevision = document.Id;
-                Changed(null); RefreshCommands();
+                Changed(null);
+                RefreshCommands();
             });
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception error) { if (!_disposed) _dispatch(() => Viewport.ReportError(error)); }
+        catch (Exception error) { if (!_disposed) _dispatch(() => { if (!_disposed) Viewport.ReportError(error); }); }
     }
     private bool Available(PdfTool tool) => tool switch
     {
@@ -371,10 +392,19 @@ public sealed class PdfWorkspace : INotifyPropertyChanged, IDisposable
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? property = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        field = value; Changed(property); return true;
+        field = value;
+        Changed(property);
+        return true;
     }
-    private void Changed([CallerMemberName] string? property = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
-    private void RefreshCommands() { foreach (var command in _commands) command.Refresh(); }
+    private void Changed([CallerMemberName] string? property = null) => _dispatch(() =>
+    {
+        if (!_disposed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
+    });
+    private void RefreshCommands() => _dispatch(() =>
+    {
+        // WPF ButtonBase subscribes directly: raising this event on a pool continuation violates UI affinity.
+        foreach (var command in _commands) command.Refresh();
+    });
     public void Dispose()
     {
         if (_disposed) return;
