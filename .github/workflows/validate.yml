@@ -4,7 +4,7 @@ on:
     inputs:
       version:
         type: string
-        default: '0.1.0-alpha.2'
+        default: '0.1.0-alpha.3'
       artifact-prefix:
         type: string
         default: validation
@@ -43,6 +43,8 @@ jobs:
             8.0.x
       - name: Restore
         run: dotnet restore ProPDF.slnx
+      - name: Verify source-pinned renderer and legal notices
+        run: python scripts/verify-renderer-source.py
       - name: Enforce permissive dependency licenses
         run: python scripts/audit-licenses.py
       - name: License gate regression tests
