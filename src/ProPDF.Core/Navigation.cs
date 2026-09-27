@@ -12,7 +12,7 @@ public sealed record PdfNavigationTarget(int PageNumber = 0, PdfDestinationFit F
 }
 public sealed record PdfNavigationBookmark(string Path, string Title, int Depth, bool IsOpen, PdfNavigationTarget Target)
 {
-    public override string ToString() => new string(' ', Math.Min(Depth, 32) * 2) + Title;
+    public override string ToString() => new string(' ', Math.Clamp(Depth, 0, 32) * 2) + Title;
 }
 public sealed record PdfNavigationLink(int PageNumber, string Id, PdfRect Bounds, PdfNavigationTarget Target)
 {
@@ -36,7 +36,8 @@ public static class PdfUriPolicy
         uri = null;
         if (string.IsNullOrWhiteSpace(value) || value.Length > 4096 || value.Any(char.IsControl) || value.Contains('\\')) return false;
         if (!System.Uri.TryCreate(value, UriKind.Absolute, out var candidate) || candidate.Scheme is not ("https" or "http" or "mailto")) return false;
-        if (!string.IsNullOrEmpty(candidate.UserInfo)) return false;
+        // System.Uri exposes the local part of a mailto recipient as UserInfo. It is not a web credential.
+        if (candidate.Scheme is "http" or "https" && !string.IsNullOrEmpty(candidate.UserInfo)) return false;
         uri = candidate;
         return true;
     }
