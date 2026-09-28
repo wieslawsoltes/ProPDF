@@ -29,6 +29,9 @@ public static partial class BrowserTest
         using var scene = c.CaptureScene();
         writer.WriteStartObject();
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
+        writer.WriteString("viewportRevision", c.Document?.Id.ToString()); writer.WriteBoolean("rendering", c.IsRendering);
+        writer.WriteNumber("viewportWidth", c.Viewport.Width); writer.WriteNumber("viewportHeight", c.Viewport.Height);
+        writer.WriteNumber("viewWidth", _editor?.View.ActualWidth ?? 0); writer.WriteNumber("viewHeight", _editor?.View.ActualHeight ?? 0);
         writer.WriteNumber("pageWidth", w.Document?.GetPage(c.CurrentPage).Size.Width ?? 0);
         writer.WriteNumber("pageItems", ((ListView)Find("PagesList")).Items.Count);
         writer.WriteNumber("page", c.CurrentPage); writer.WriteNumber("zoom", c.Zoom);

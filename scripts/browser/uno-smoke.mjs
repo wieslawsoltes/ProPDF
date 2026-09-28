@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { waitForReopenedDocument } from './presentation.mjs';
 const base = process.env.PROPDF_URL || 'http://127.0.0.1:4173/ProPDF/';
 const out = process.env.PROPDF_QA || 'artifacts/browser';
 await mkdir(out, { recursive: true });
@@ -262,8 +263,12 @@ try {
   assert.ok(Math.abs(ink[0].height - ink[1].height) <= 2);
   checks.push('real PDF import/export respects explicit substitute-font widths without distorting glyph height');
   await openPdf(pdf); assert.equal((await state()).pages, 3);
-  await page.setViewportSize({ width: 800, height: 900 }); await page.waitForTimeout(400);
-  assert.ok((await state()).tiles > 0); await page.screenshot({ path: `${out}/uno-narrow.png`, timeout: 10000 }); checks.push('responsive narrow viewport');
+  assert.ok((await bounded(page.evaluate(() => propdfTest.TextContent()), 'reopened document text')).includes('Your documents.'));
+  await page.setViewportSize({ width: 800, height: 900 });
+  await progress('reopened document compositor presentation');
+  const presentation = await waitForReopenedDocument(page, `${out}/uno-narrow.png`);
+  await writeFile(`${out}/presentation.json`, JSON.stringify(presentation, null, 2));
+  assert.ok((await state()).tiles > 0); checks.push('responsive narrow viewport presents the reopened PDF, not the previous fixture');
   assert.deepEqual(errors, [], 'No unhandled JavaScript failures'); assert.deepEqual(requests, [], 'No missing runtime assets');
   await writeFile(`${out}/results.json`, JSON.stringify({ checks, state: await state(), errors, requests }, null, 2));
   console.log(`PASS: ${checks.length} Uno browser workflows.`);
