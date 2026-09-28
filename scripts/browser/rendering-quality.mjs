@@ -61,7 +61,7 @@ export async function verifyDensityTransition(browser, base, out) {
     // temporarily reapplies the context's original deviceScaleFactor (2 here),
     // undoing a later density-only override and invalidating this experiment.
     await cdp.send('Emulation.setDeviceMetricsOverride',{width:1200,height:900,deviceScaleFactor:2,mobile:false});
-    async function capture(density, path) {
+    async function capture(density, path, reference = null) {
       const started=Date.now();let attempts=0;
       do {
         assert.equal(await page.evaluate(()=>devicePixelRatio),density,'Capture must not reset display density.');
@@ -74,24 +74,39 @@ export async function verifyDensityTransition(browser, base, out) {
         const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);
         assert.equal(width,1200*density);assert.equal(height,900*density);
         assert.equal(await page.evaluate(()=>devicePixelRatio),density,'Screenshot changed the emulated density.');
-        const navyPixels=await page.evaluate(async ({data,density})=>{
+        const frame=await page.evaluate(async ({data,density})=>{
           const image=new Image();image.src='data:image/png;base64,'+data;await image.decode();
           const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
           const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
-          const pixels=ctx.getImageData(0,0,image.width,image.height).data;let count=0;
-          // Inspect the actual PDF panel, not the app header or thumbnail backgrounds.
+          const pixels=ctx.getImageData(0,0,image.width,image.height).data;
+          let count=0,left=image.width,top=image.height,right=-1,bottom=-1,header=0,headerSamples=0;
+          // The PDF panel must keep its logical geometry, not merely exist somewhere
+          // in a stale-size compositor buffer. The app header must remain at the top.
           for(let y=Math.ceil(180*density);y<image.height-50*density;y++)
-            for(let x=Math.ceil(200*density);x<image.width-325*density;x++) {
+            for(let x=0;x<image.width-325*density;x++) {
               const i=(y*image.width+x)*4;
-              if(Math.abs(pixels[i]-24)<4 && Math.abs(pixels[i+1]-43)<4 && Math.abs(pixels[i+2]-79)<4)count++;
+              if(Math.abs(pixels[i]-24)<4 && Math.abs(pixels[i+1]-43)<4 && Math.abs(pixels[i+2]-79)<4) {
+                count++;left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+              }
             }
-          return count;
+          for(let y=Math.ceil(4*density);y<12*density;y++)
+            for(let x=Math.ceil(4*density);x<80*density;x++) {
+              const i=(y*image.width+x)*4;headerSamples++;
+              if(Math.abs(pixels[i]-18)<4 && Math.abs(pixels[i+1]-33)<4 && Math.abs(pixels[i+2]-61)<4)header++;
+            }
+          return {navyPixels:count,headerFraction:header/headerSamples,
+            bounds:{left:left/density,top:top/density,right:(right+1)/density,bottom:(bottom+1)/density}};
         },{data,density});
         attempts++;
-        if(navyPixels>=10000*density*density) {
+        const stableBounds = !reference || Object.keys(frame.bounds).every(
+          key=>Math.abs(frame.bounds[key]-reference.bounds[key])<=2);
+        const stableArea = !reference || Math.abs(frame.navyPixels/density**2-
+          reference.navyPixels/4)/(reference.navyPixels/4)<.05;
+        if(frame.navyPixels>=10000*density*density && frame.headerFraction>.95 && stableBounds && stableArea) {
           await writeFile(path,bytes);
-          return {width,height,navyPixels,attempts};
+          return {width,height,...frame,attempts};
         }
+        await writeFile(`${out}/density-presentation-pending.json`,JSON.stringify({density,frame,reference,attempts},null,2));
         await page.waitForTimeout(100);
       } while(Date.now()-started<15000);
       assert.fail('The PDF was not composited at the requested display density.');
@@ -118,7 +133,7 @@ export async function verifyDensityTransition(browser, base, out) {
     assert.ok(retina.state.rasterPixels>fractional.state.rasterPixels*1.7);
     const a=retina.thumbnails.find(t=>t.page===1), b=fractional.thumbnails.find(t=>t.page===1);
     assert.ok(a.pixels>b.pixels*2.4 && a.pixels<b.pixels*2.7,'Thumbnail pixels must follow display density squared.');
-    const fractionalFrame=await capture(1.25,`${out}/uno-density-1_25.png`);
+    const fractionalFrame=await capture(1.25,`${out}/uno-density-1_25.png`,retinaFrame);
     assert.equal((await settled(1.25)).state.revision,retina.state.revision);
     assert.deepEqual(errors,[]);assert.deepEqual(missing,[]);
     await writeFile(`${out}/density.json`,JSON.stringify({retina,fractional,retinaFrame,fractionalFrame,errors,missing},null,2));
