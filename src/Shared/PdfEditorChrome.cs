@@ -7,6 +7,7 @@ using ProPDF.Presentation;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -147,7 +148,7 @@ internal sealed class PdfEditorChrome
         _title = Text("All tools", 18, true); Add(toolsHeader, _title, 0, 1);
         _closeTools = ActionButton("Close tools pane", "Shell.CloseToolsCommand", PdfShellIcons.Close, false, "CloseToolsButton"); Add(toolsHeader, _closeTools, 0, 2); Add(tools, toolsHeader);
         var toolSettings = Stack(); toolSettings.Margin = new Thickness(16, 0, 16, 12);
-        var tool = Choice("Tools", "SelectedTool", "Drawing / selection tool", "Title"); toolSettings.Children.Add(tool);
+        var toolChoice = Choice("Tools", "SelectedTool", "Drawing / selection tool", "Title"); toolSettings.Children.Add(toolChoice);
         toolSettings.Children.Add(Input("ToolText", "Text, comment or field name"));
         _toolSettings = Edge(toolSettings, new Thickness(0, 0, 0, 1)); Add(tools, _toolSettings, 1);
         var sectionBody = new Grid(); Add(tools, sectionBody, 2);
