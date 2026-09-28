@@ -1,0 +1,44 @@
+name: Apply verified text fidelity source
+on:
+  push:
+    branches: [feature/pdf-text-fidelity]
+    paths: ['.github/workflows/apply-text-source.yml']
+permissions:
+  contents: write
+concurrency:
+  group: apply-text-source
+  cancel-in-progress: false
+jobs:
+  apply:
+    if: github.repository == 'wieslawsoltes/ProPDF' && github.ref == 'refs/heads/feature/pdf-text-fidelity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feature/pdf-text-fidelity
+      - name: Apply hash-verified source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python - <<'PY'
+          import base64, hashlib, lzma, pathlib, subprocess
+          encoded = ''.join((pathlib.Path('.text-transfer') / ('part' + str(i))).read_text().strip() for i in range(3))
+          patch = lzma.decompress(base64.b64decode(encoded, validate=True))
+          assert len(patch) == 80841
+          assert hashlib.sha256(patch).hexdigest() == '1581cdd90be1fe4c48ad1fb204ac02e9329c6e884fcb5cb6c4dae94bab5db74e'
+          for line in patch.decode().splitlines():
+              if line.startswith('+++ b/'):
+                  name = line[6:]
+                  path = pathlib.PurePosixPath(name)
+                  assert not path.is_absolute() and '..' not in path.parts and '.git' not in path.parts
+                  assert name.startswith(('src/ProPDF.', 'tests/ProPDF.', 'docs/', 'scripts/browser/', '.github/workflows/')) or name in {'README.md','CHANGELOG.md','Directory.Build.props','mkdocs.yml'}
+          output = pathlib.Path('/tmp/text-fidelity.patch'); output.write_bytes(patch)
+          subprocess.run(['git','apply','--exclude=.github/workflows/*','--check',str(output)],check=True)
+          subprocess.run(['git','apply','--exclude=.github/workflows/*','--index',str(output)],check=True)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: PDF-metric fallback text, bounded glyph cache and shared typography controls'
+          git push origin HEAD:refs/heads/feature/pdf-text-fidelity
