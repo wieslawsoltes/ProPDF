@@ -59,13 +59,17 @@
       <TextBlock Text="Replacement stretches to the existing image geometry and retains clipping. Only this invocation changes." FontSize="11" TextWrapping="Wrap" Margin="0,5"/>
     </StackPanel>
   </Expander>
-  <Expander Header="TEXT REPLACEMENT" Margin="0,8,0,0"><StackPanel>
-  <TextBlock Text="REPLACE TEXT OBJECT" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
+  <Expander x:Name="TextSection" Header="TEXT / TYPOGRAPHY" Margin="0,8,0,0"><StackPanel>
+  <TextBlock Text="INSERT / REPLACE TEXT" FontSize="10" FontWeight="SemiBold" Margin="0,12,0,5"/>
   <TextBox Text="{Binding ContentText, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="78"/>
+  <TextBlock Text="Font face · Helvetica / Courier" Margin="0,6,0,2"/>
+  <ComboBox x:Name="ContentStandardFontChoice" ItemsSource="{Binding ContentStandardFonts}" SelectedItem="{Binding ContentStandardFont, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+  <TextBlock Text="Line spacing · font-size multiplier" Margin="0,6,0,2"/>
+  <TextBox x:Name="ContentLineSpacingInput" Text="{Binding ContentLineSpacing, Mode=TwoWay}"/>
   <TextBlock Text="Font size" Margin="0,6,0,2"/><TextBox Text="{Binding ContentFontSize, Mode=TwoWay}"/>
   <ComboBox ItemsSource="{Binding TextAlignments}" SelectedItem="{Binding TextAlignment, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,5"/>
-  <Button Content="Replace selected text" Command="{Binding ReplaceObjectTextCommand}"/>
-  <TextBlock Text="Replacement wraps in the size above. Overflow is rejected. Other objects are preserved." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
+  <Button x:Name="ReplaceObjectTextButton" Content="Replace selected text" Command="{Binding ReplaceObjectTextCommand}"/>
+  <TextBlock Text="Font and size also apply to Insert text and Text box tools; line spacing applies to wrapped boxes. Replacement restyles the whole object. Overflow is rejected." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>
   </StackPanel></Expander>
   <Button Content="Clip to selected region" Command="{Binding ClipObjectCommand}"/>
   <TextBlock Text="Select an object, then use Select region. Clipping only hides content; it is not redaction." FontSize="11" TextWrapping="Wrap" Margin="0,6"/>

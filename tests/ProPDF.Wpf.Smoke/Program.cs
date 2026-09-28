@@ -127,6 +127,38 @@ internal static class Program
             if (!ReferenceEquals(runtime.Session.Current, alignmentRevision)) throw new InvalidOperationException("Alignment was not one undoable edit.");
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Kind == PdfContentObjectKind.Text && item.Text is "Your documents." or "Your workspace."));
+            // Exercise actual two-way typography controls and the bound native PDF edit command.
+            workspace.SelectedContentObject = workspace.ContentObjects.Single(item => item.Text == "Your documents.");
+            ((Expander)contentPanel.FindName("TextSection")).IsExpanded = true;
+            application.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            var faceChoice = ((ComboBox)contentPanel.FindName("ContentStandardFontChoice"));
+            var lineSpacingInput = ((TextBox)contentPanel.FindName("ContentLineSpacingInput"));
+            var textReplaceButton = ((Button)contentPanel.FindName("ReplaceObjectTextButton"));
+            faceChoice.SelectedItem = "Courier-Bold";
+            lineSpacingInput.Text = "1.6";
+            application.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            if (workspace.ContentStandardFont != "Courier-Bold" || workspace.ContentLineSpacing != "1.6" ||
+                !ReferenceEquals(textReplaceButton.Command, workspace.ReplaceObjectTextCommand))
+                throw new InvalidOperationException("Native typography controls are not bound.");
+            workspace.ContentText = "First row\nSecond row";
+            workspace.ContentFontSize = "18"; workspace.ContentWidth = "300"; workspace.ContentHeight = "100";
+            var typographyRevision = runtime.Session.Current!;
+            Pump(((ProPDF.Presentation.PdfUiCommand)textReplaceButton.Command!).ExecuteAsync());
+            if (runtime.Session.Current!.Id == typographyRevision.Id) throw new InvalidOperationException("Typography replacement did not publish.");
+            using (var typographyInput = runtime.Session.Current.OpenRead())
+            using (var independent = UglyToad.PdfPig.PdfDocument.Open(typographyInput))
+            {
+                var letters = independent.GetPage(1).Letters.Where(l => l.FontName == "Courier-Bold").ToArray();
+                if (string.Concat(letters.Select(l => l.Value)) != "First rowSecond row" ||
+                    Math.Abs(Math.Abs(letters[0].StartBaseLine.Y - letters[9].StartBaseLine.Y) - 28.8) > .01)
+                    throw new InvalidOperationException("Native typography controls did not write the requested face and line spacing.");
+            }
+            Pump(workspace.UndoCommand.ExecuteAsync());
+            if (!ReferenceEquals(typographyRevision, runtime.Session.Current)) throw new InvalidOperationException("Typography undo was not atomic.");
+            workspace.ContentFontSize = "14"; faceChoice.SelectedItem = "Helvetica"; lineSpacingInput.Text = "1.2";
+            ((Expander)contentPanel.FindName("TextSection")).IsExpanded = false;
+            Pump(runtime.Viewport.LoadContentAsync());
+            workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Text is "Your documents." or "Your workspace."));
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("WPF search command failed.");

@@ -247,18 +247,10 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
                     return skiaFontCacheItem;
                 }
 
-                // Check if we need to create cache item
-                var item = typeface is null || typeface.IsDefault()
+                // Preserve a resolved bold/italic face even if its family is the default family.
+                var item = typeface is null
                     ? DefaultSkiaFontCacheItem.Value
                     : new SkiaFontCacheItem(typeface);
-
-                if (!ReferenceEquals(item.Typeface, typeface))
-                {
-                    // The resolved wrapper was replaced by the shared default item: release it so it
-                    // doesn't leak its native reference. (Disposing SKTypeface.Default itself is a
-                    // protected no-op in SkiaSharp, so this is safe whichever instance we got.)
-                    typeface?.Dispose();
-                }
 
                 // The shared default item can be re-resolved for the same key by successive
                 // unmatched codepoints; without this check it gets appended once per codepoint and
@@ -299,7 +291,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
                 return 0;
             }
 
-            return BitConverter.ToInt32(Encoding.UTF32.GetBytes(unicode), 0);
+            return Rune.TryGetRuneAt(unicode, 0, out var rune) ? rune.Value : 0;
         }
 
         private bool IsDisposed()
@@ -379,7 +371,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
 
                 foreach (var value in fontCache.Values)
                 {
-                    value?.Value?.Dispose();
+                    if (value.IsValueCreated) value.Value?.Dispose();
                 }
 
                 fontCache.Clear();
@@ -396,7 +388,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
 
                 foreach (var value in perFont.Values)
                 {
-                    value?.Value?.Dispose();
+                    if (value.IsValueCreated) value.Value?.Dispose();
                 }
 
                 perFont.Clear();

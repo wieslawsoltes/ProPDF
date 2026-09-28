@@ -10,6 +10,7 @@ public sealed partial class PdfWorkspace
 {
     private IReadOnlyList<PdfContentObject>? _contentEditorSelection;
     private string _contentX = "0", _contentY = "0", _contentWidth = "100", _contentHeight = "40", _contentText = "", _contentFontSize = "14";
+    private string _contentStandardFont = "Helvetica", _contentLineSpacing = "1.2";
     private PdfUiCommand? _editObjects, _refreshObjects, _applyBounds, _deleteObject, _duplicateObject, _rotateObject, _flipObject, _replaceObjectText, _clipObject;
     private PdfUiCommand? _selectAllObjects, _selectRegionObjects, _clearObjects, _alignObjects, _distributeObjects;
     private PdfSelectionAlignment _contentAlignment;
@@ -42,8 +43,26 @@ public sealed partial class PdfWorkspace
         get => _contentFontSize;
         set
         {
-            if (Set(ref _contentFontSize, value) && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var size) && double.IsFinite(size) && size is >= 1 and <= 1000)
-                Viewport.TextBoxFontSize = size;
+            if (Set(ref _contentFontSize, value))
+                Viewport.TextBoxFontSize = double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var size) ? size : double.NaN;
+        }
+    }
+    /// <summary>Built-in Latin text-box faces whose metrics are supported by the owned layout engine.</summary>
+    public IReadOnlyList<string> ContentStandardFonts { get; } = Array.AsReadOnly(new[] {
+        "Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
+        "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique" });
+    public string ContentStandardFont
+    {
+        get => _contentStandardFont;
+        set { if (value is not null && Set(ref _contentStandardFont, value)) Viewport.TextBoxStandardFont = value; }
+    }
+    public string ContentLineSpacing
+    {
+        get => _contentLineSpacing;
+        set
+        {
+            if (Set(ref _contentLineSpacing, value))
+                Viewport.TextBoxLineSpacing = double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var spacing) ? spacing : double.NaN;
         }
     }
     public PdfTextAlignment[] TextAlignments { get; } = Enum.GetValues<PdfTextAlignment>();
@@ -149,7 +168,7 @@ public sealed partial class PdfWorkspace
     public PdfUiCommand ReplaceObjectTextCommand => _replaceObjectText ??= Command(token =>
     {
         var item = SelectedContentObject!; var size = ContentNumber(ContentFontSize); Viewport.TextBoxFontSize = size;
-        return Session.ApplyAsync(new ReplaceContentText(item.Reference, ContentBounds(), ContentText, size, TextAlignment), item.Reference.Revision, token);
+        return Session.ApplyAsync(new ReplaceContentText(item.Reference, ContentBounds(), ContentText, size, TextAlignment, StandardFont: ContentStandardFont, LineSpacing: ContentNumber(ContentLineSpacing)), item.Reference.Revision, token);
     }, () => CanEditContent() && SelectedContentObject?.Kind == PdfContentObjectKind.Text);
     public PdfUiCommand ClipObjectCommand => _clipObject ??= Command(token =>
     {

@@ -10,6 +10,10 @@ Every source file moves from `UglyToad.PdfPig.Rendering.Skia` to `ProPDF.Engine.
 
 No fonts, PDF fixtures, private keys or upstream project signing key are imported. Existing permissive codec/font package versions are unchanged; the binary PdfPig.Rendering.Skia dependency is removed. The assembly package license expression is `MIT AND Apache-2.0`; notices are included in packages and native sample output.
 
+## Text rendering corrections (alpha.6)
+
+`SkiaStreamProcessor.Glyph.cs` fits non-embedded substitute outlines to the PDF character advance and sends them through the same fill/stroke/text-clip path as embedded outlines. It does not change the text pen, embedded fonts or document bytes. An owned `PdfFallbackGlyphCache` outside this third-party directory provides bounded design-space Unicode/direction outline loans. Size and zoom are not cache keys. Bitmap-only glyphs retain the upstream draw route; complex vertical/color-font behavior is not newly qualified. Temporary glyph paths are disposed. `SkiaFontCacheItem` owns/disposes its glyph cache, and `SkiaFontCache.Font.cs` retains resolved styles even in the default family, avoids per-character UTF-32 byte allocation, and does not evaluate unmaterialized glyph paths during disposal. Original upstream hashes remain unchanged; only reviewed compiled-source hashes are updated.
+
 ## Maintenance
 
 Review upgrades against the pinned commit and this hash inventory, preserve notices, and run source-inventory, pixel, native UI and external-package checks. The inventory detects accidental additions/removals/edits; it is not a signature or security audit. This patch fixes the covered image paths, not every PDF transparency, group, color-management, font, codec or conformance case.

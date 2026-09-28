@@ -25,16 +25,24 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
         {
             Typeface = typeface ?? throw new ArgumentNullException(nameof(typeface));
             Shaper = new SKShaper(Typeface);
+            try { Glyphs = new PdfFallbackGlyphCache(Typeface); }
+            catch { Shaper.Dispose(); throw; }
         }
 
         public SKTypeface Typeface { get; }
 
         public SKShaper Shaper { get; }
 
+        public PdfFallbackGlyphCache Glyphs { get; }
+        private bool _disposed;
+
         public void Dispose()
         {
-            Typeface.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+            Glyphs.Dispose();
             Shaper.Dispose();
+            Typeface.Dispose();
         }
     }
 }

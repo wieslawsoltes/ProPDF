@@ -65,6 +65,29 @@ async function download(name, filename) {
   const path = `${out}/${filename || file.suggestedFilename()}`;
   await file.saveAs(path); assert.equal(await file.failure(), null); return path;
 }
+async function openPdf(path) {
+  const chooser = page.waitForEvent('filechooser');
+  const opening = bounded(page.evaluate(() => propdfTest.Click('OpenButton')), 'PDF import');
+  await (await chooser).setFiles(path); await opening; await healthy();
+}
+// Synthetic ASCII PDF with explicit font advances; no font programs or external assets.
+function fallbackMetricPdf() {
+  const stream = 'BT /N 40 Tf 1 0 0 1 20 130 Tm (M) Tj ET\nBT /W 40 Tf 1 0 0 1 20 55 Tm (M) Tj ET\n';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 240 180] /Resources << /Font << /N 4 0 R /W 6 0 R >> >> /Contents 7 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /ProPDFMissingTypeface /Encoding /WinAnsiEncoding /FirstChar 77 /LastChar 77 /Widths [200] /FontDescriptor 5 0 R >>',
+    '<< /Type /FontDescriptor /FontName /ProPDFMissingTypeface /Flags 32 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /ProPDFMissingTypeface /Encoding /WinAnsiEncoding /FirstChar 77 /LastChar 77 /Widths [800] /FontDescriptor 5 0 R >>',
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream`];
+  let output = '%PDF-1.7\n'; const offsets = [0];
+  objects.forEach((value, i) => { offsets.push(Buffer.byteLength(output)); output += `${i + 1} 0 obj\n${value}\nendobj\n`; });
+  const xref = Buffer.byteLength(output);
+  output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) output += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  return Buffer.from(output + `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+}
 const watchdog = setTimeout(async () => {
   await writeFile(`${out}/watchdog.json`, JSON.stringify({ checkpoint, checks, lastState, errors, requests, consoleMessages }, null, 2)).catch(() => {});
   console.error('Browser workflow deadline exceeded at', checkpoint);
@@ -182,6 +205,25 @@ try {
   }, imageBytes.toString('base64')), 'independent PNG pixel check');
   assert.ok(magenta > 100, 'The exported PDF must contain the newly colored text, not only a valid PNG header.');
   checks.push('appearance edit, actual raster download and independent colored pixels'); await command('UndoButton');
+  await section(0); await command('EditObjectsButton');
+  objects = await objectsForSelection('objects before typography replacement');
+  await bounded(page.evaluate(i => propdfTest.SelectObject(i, false), objects.find(o => o.text === 'Your documents.').index), 'typography selection');
+  await bounded(page.evaluate(() => propdfTest.Expand('TextSection', true)), 'expand typography');
+  await page.waitForFunction(() => JSON.parse(propdfTest.Controls()).some(c => c.name === 'ContentStandardFontChoice'));
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentStandardFontChoice', 5)), 'choose Courier-Bold');
+  await text('ContentLineSpacingInput', '1.6'); await text('ContentFontSizeInput', '18');
+  await text('ContentWidthInput', '300'); await text('ContentHeightInput', '100');
+  await text('ContentTextInput', 'First row\nSecond row');
+  await command('ReplaceObjectTextButton');
+  const typedObjects = JSON.parse(await bounded(page.evaluate(() => propdfTest.Objects()), 'independent typography objects'));
+  const line1 = typedObjects.find(o => o.text === 'First row'), line2 = typedObjects.find(o => o.text === 'Second row');
+  assert.ok(line1 && line2); assert.ok(Math.abs(line2.y - line1.y - 28.8) < .1);
+  // Courier has a 600-unit advance. The first line has nine characters at 18 points.
+  assert.ok(Math.abs(line1.width - 97.2) < 1, 'The native face control must affect the actual PDF text metrics.');
+  await command('UndoButton'); assert.equal((await state()).dirty, false);
+  await bounded(page.evaluate(() => propdfTest.Choose('ContentStandardFontChoice', 0)), 'restore text face');
+  await text('ContentLineSpacingInput', '1.2'); await text('ContentFontSizeInput', '14');
+  checks.push('native typography controls, replacement line spacing/font metrics and atomic undo');
   await section(5); await text('DocumentTitleInput', 'ProPDF browser round trip'); await command('SaveMetadataButton');
   assert.equal((await state()).title, 'ProPDF browser round trip');
   const pdf = await download('SaveButton', 'roundtrip.pdf'); assert.equal((await readFile(pdf)).subarray(0, 5).toString(), '%PDF-');
@@ -194,6 +236,32 @@ try {
   checks.push('actual file picker and saved PDF reopen');
   await section(4); const txt = await download('ExportTextButton', 'document.txt');
   assert.ok((await readFile(txt, 'utf8')).includes('Your documents.')); checks.push('text export through shared pipeline');
+  await progress('independent substitute-font width fixture');
+  const metricPdf = `${out}/fallback-metrics.pdf`; await writeFile(metricPdf, fallbackMetricPdf());
+  await openPdf(metricPdf); assert.equal((await state()).pages, 1);
+  await section(4); await text('ExportDpiInput', '72');
+  const metricPng = await download('ExportPngButton', 'fallback-metrics.png');
+  const ink = await bounded(page.evaluate(async base64 => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + base64; await img.decode();
+    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const pixels = ctx.getImageData(0, 0, img.width, img.height).data;
+    function bounds(top, bottom) {
+      let minX = img.width, maxX = -1, minY = bottom, maxY = -1;
+      for (let y = top; y < bottom; y++) for (let x = 0; x < img.width; x++) {
+        const i = (y * img.width + x) * 4;
+        if (pixels[i] < 128 && pixels[i + 1] < 128 && pixels[i + 2] < 128) {
+          minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+      }
+      return { width: maxX - minX + 1, height: maxY - minY + 1 };
+    }
+    return [bounds(0, 75), bounds(80, 170)];
+  }, (await readFile(metricPng)).toString('base64')), 'independent fallback glyph width pixels');
+  assert.ok(ink[0].width > 1 && ink[1].width / ink[0].width > 3 && ink[1].width / ink[0].width < 5);
+  assert.ok(Math.abs(ink[0].height - ink[1].height) <= 2);
+  checks.push('real PDF import/export respects explicit substitute-font widths without distorting glyph height');
+  await openPdf(pdf); assert.equal((await state()).pages, 3);
   await page.setViewportSize({ width: 800, height: 900 }); await page.waitForTimeout(400);
   assert.ok((await state()).tiles > 0); await page.screenshot({ path: `${out}/uno-narrow.png`, timeout: 10000 }); checks.push('responsive narrow viewport');
   assert.deepEqual(errors, [], 'No unhandled JavaScript failures'); assert.deepEqual(requests, [], 'No missing runtime assets');

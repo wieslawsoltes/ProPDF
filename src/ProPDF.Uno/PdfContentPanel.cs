@@ -53,8 +53,10 @@ public sealed class PdfContentPanel : UserControl
         image.Children.Add(PdfUi.Button("Replace image…", "ReplaceImageCommand")); image.Children.Add(PdfUi.Button("Apply interpolation", "ApplyImageInterpolationCommand"));
         panel.Children.Add(Section("Image", image));
         var text = PdfUi.Stack(); PdfUi.Field(text, "Replacement text", "ContentText", true); PdfUi.Field(text, "Font size", "ContentFontSize");
+        text.Children.Add(PdfUi.Choice("ContentStandardFonts", "ContentStandardFont", "Font face"));
+        PdfUi.Field(text, "Line spacing · font-size multiplier", "ContentLineSpacing");
         text.Children.Add(PdfUi.Choice("TextAlignments", "TextAlignment", "Text alignment")); text.Children.Add(PdfUi.Button("Replace selected text", "ReplaceObjectTextCommand"));
-        text.Children.Add(PdfUi.Label("Wraps within the selected size. Overflow is rejected; other objects are preserved.")); panel.Children.Add(Section("Text replacement", text));
+        text.Children.Add(PdfUi.Label("Font and size also apply to Insert text and Text box tools; line spacing applies to wrapped boxes. Whole-object replacement rejects overflow.")); var typography = Section("Text / typography", text); typography.Name = "TextSection"; panel.Children.Add(typography);
         panel.Children.Add(PdfUi.Button("Clip to selected region", "ClipObjectCommand")); panel.Children.Add(PdfUi.Label("Clipping hides content. It is not redaction."));
         _objects.SelectionChanged += Selected; DataContextChanged += (_, _) => Connect(); Loaded += (_, _) => Connect(); Unloaded += (_, _) => Disconnect();
     }

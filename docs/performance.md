@@ -35,3 +35,7 @@ use an explicit synchronous dispatcher; tests of queued hosts explicitly drain
 their own queue. These completion points must not be conflated or replaced with
 fixed sleeps. Both modes retain the same production coalescing and tile-ownership
 behavior.
+
+## Substitute glyph reuse
+
+The optional renderer caches substitute outlines in font-design coordinates, independently of font size, page zoom and tile scale. Each resolved typeface retains at most 256 Unicode/direction mappings and approximately 512 KiB of outlines. Oversized entries remain transient. A held outline lease remains valid after eviction or cache disposal. The glyph cache does not account for the entire font manager, shaper, parser or native allocation footprint; active leases can temporarily exceed its retained-cache budget. See [Text rendering and typography](text-rendering.md) for width fitting and qualification limits.
