@@ -59,7 +59,11 @@
   <TabControl x:Name="InspectorTabs" BorderThickness="0" Background="White" Padding="0">
     <TabControl.Template>
       <ControlTemplate TargetType="TabControl">
-        <ContentPresenter x:Name="PART_SelectedContentHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{TemplateBinding SelectedContent}" ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+        <Grid RowDefinitions="0,*">
+          <!-- TabControl requires its item containers even with a task-based external selector. -->
+          <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="0" ItemsPanel="{TemplateBinding ItemsPanel}" Height="0" Opacity="0" IsHitTestVisible="False" KeyboardNavigation.TabNavigation="None"/>
+          <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Content="{TemplateBinding SelectedContent}" ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+        </Grid>
       </ControlTemplate>
     </TabControl.Template>
     <TabItem Header="Edit">

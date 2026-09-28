@@ -66,6 +66,12 @@ async function section(index) {
   await page.waitForFunction(() => JSON.parse(propdfTest.State()).section === 'AllTools');
   await pointer('Tool' + name + 'Button');
   await page.waitForFunction(name => JSON.parse(propdfTest.State()).section === name, name);
+  // A task changes synchronously; its native ContentControl is realized on a
+  // subsequent dispatcher pass. Observe the actual input, not only shell state.
+  const ready = ['ContentObjectsList', 'CommentInput', 'FieldValueInput', 'NavigationBookmarksList',
+    'ExportDpiInput', 'DocumentTitleInput', 'OrganizeRotateButton', 'MarkRedactionButton'][index];
+  await page.waitForFunction(name => JSON.parse(propdfTest.Controls()).some(c =>
+    c.name === name && c.visible && c.width > 0 && c.height > 0), ready);
 }
 async function download(name, filename) {
   const pending = page.waitForEvent('download');
@@ -306,7 +312,10 @@ try {
   console.log(`PASS: ${checks.length} Uno browser workflows.`);
 } catch (error) {
   await page.screenshot({ path: `${out}/failure.png`, timeout: 4000 }).catch(() => {});
-  await writeFile(`${out}/failure.json`, JSON.stringify({ checkpoint, error: String(error), stack: error.stack, errors, requests, consoleMessages, checks, state: lastState }, null, 2));
+  const finalState = await state().catch(() => lastState);
+  const finalControls = await page.evaluate(() => JSON.parse(propdfTest.Controls())).catch(() => []);
+  await writeFile(`${out}/failure-controls.json`, JSON.stringify(finalControls, null, 2));
+  await writeFile(`${out}/failure.json`, JSON.stringify({ checkpoint, error: String(error), stack: error.stack, errors, requests, consoleMessages, checks, state: finalState }, null, 2));
   throw error;
 } finally {
   clearTimeout(watchdog);
