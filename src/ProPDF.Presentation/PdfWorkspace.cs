@@ -435,6 +435,7 @@ public sealed partial class PdfWorkspace : INotifyPropertyChanged, IDisposable
     {
         // WPF ButtonBase subscribes directly: raising this event on a pool continuation violates UI affinity.
         foreach (var command in _commands) command.Refresh();
+        _activateTool?.Refresh();
     });
     public void Dispose()
     {

@@ -5,4 +5,6 @@
     <Description>WPF PDF viewer, thumbnail and editor controls with shared Skia rendering. No legacy Skia views or OpenTK dependency.</Description>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../ProPDF.Presentation/ProPDF.Presentation.csproj" /></ItemGroup>
+  <PropertyGroup><DefineConstants>$(DefineConstants);PROPDF_WPF</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="../Shared/PdfEditorChrome.cs" Link="PdfEditorChrome.cs" /></ItemGroup>
 </Project>

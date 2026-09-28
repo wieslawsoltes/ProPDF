@@ -28,7 +28,7 @@ public sealed class PdfNavigationPanel : UserControl
         AddButton(edits, "Child", nameof(PdfWorkspace.InsertChildBookmarkCommand));
         AddButton(edits, "Rename", nameof(PdfWorkspace.RenameBookmarkCommand));
         AddButton(edits, "Delete", nameof(PdfWorkspace.DeleteBookmarkCommand));
-        panel.Children.Add(new TextBlock { Text = "Child and Rename use the toolbar text. New bookmarks target the current page.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 7) });
+        panel.Children.Add(new TextBlock { Text = "Child and Rename use the tool-settings text. New bookmarks target the current page.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 7) });
         panel.Children.Add(new TextBlock { Text = "LINKS", FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 14, 0, 7) });
         var links = new ListBox { Height = 150 };
         links.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(PdfWorkspace.NavigationLinks)));
@@ -39,7 +39,7 @@ public sealed class PdfNavigationPanel : UserControl
         AddButton(linkActions, "Follow", nameof(PdfWorkspace.FollowLinkCommand));
         AddButton(linkActions, "Copy URI", nameof(PdfWorkspace.CopyLinkCommand));
         AddButton(linkActions, "Link region", nameof(PdfWorkspace.LinkSelectionCommand));
-        panel.Children.Add(new TextBlock { Text = "Select a region and enter a destination page in the toolbar text to create a link. External links require confirmation.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 7) });
+        panel.Children.Add(new TextBlock { Text = "Select a region and enter a destination page in the tool-settings text to create a link. External links require confirmation.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 7) });
         var refresh = new WrapPanel(); panel.Children.Add(refresh);
         AddButton(refresh, "Refresh navigation", nameof(PdfWorkspace.ReloadNavigationCommand));
     }
@@ -49,19 +49,5 @@ public sealed class PdfNavigationPanel : UserControl
         button.SetBinding(ButtonBase.CommandProperty, new Binding(command));
         AutomationProperties.SetName(button, text);
         parent.Children.Add(button);
-    }
-    internal static void Install(PdfEditor owner)
-    {
-        var stack = new Stack<DependencyObject>(); stack.Push(owner);
-        while (stack.TryPop(out var current))
-        {
-            if (current is TabControl tabs)
-            {
-                if (!tabs.Items.OfType<TabItem>().Any(tab => tab.Content is PdfNavigationPanel))
-                    tabs.Items.Add(new TabItem { Header = "Navigate", Content = new PdfNavigationPanel() });
-                return;
-            }
-            foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>()) stack.Push(child);
-        }
     }
 }

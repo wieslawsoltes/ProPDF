@@ -5,7 +5,7 @@ public sealed class PdfInspectorPanels : UserControl
 {
     private readonly ContentControl _body = new();
     private readonly UIElement[] _panels;
-    public PdfInspectorPanels()
+    public PdfInspectorPanels(bool showSelector = true)
     {
         _panels = [new PdfContentPanel(), Review(), Forms(), Navigate(), Output(), Document()];
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
@@ -13,7 +13,13 @@ public sealed class PdfInspectorPanels : UserControl
             HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(12, 8, 12, 4) };
         AutomationProperties.SetAutomationId(choice, "InspectorSection"); AutomationProperties.SetName(choice, "Inspector section");
         choice.SelectionChanged += (_, _) => { if (choice.SelectedIndex >= 0) _body.Content = _panels[choice.SelectedIndex]; };
-        root.Children.Add(choice); Grid.SetRow(_body, 1); root.Children.Add(_body); _body.Content = _panels[0]; Content = root;
+        if (showSelector) root.Children.Add(choice); Grid.SetRow(_body, 1); root.Children.Add(_body); _body.Content = _panels[0]; Content = root;
+    }
+    /// <summary>Select an existing inspector without recreating its controls or losing drafts.</summary>
+    public void SelectSection(int index)
+    {
+        if ((uint)index >= (uint)_panels.Length) throw new ArgumentOutOfRangeException(nameof(index));
+        if (!ReferenceEquals(_body.Content, _panels[index])) _body.Content = _panels[index];
     }
     private static StackPanel Body() => new() { Margin = new Thickness(12), Spacing = 6 };
     private static ScrollViewer Scroll(StackPanel p) => new() { Content = p, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -22,7 +28,7 @@ public sealed class PdfInspectorPanels : UserControl
         var p = Body(); p.Children.Add(PdfUi.Label("COMMENTS", true));
         p.Children.Add(PdfUi.List("Annotations", "SelectedAnnotation", "Comments", "Contents", 220));
         PdfUi.Field(p, "Comment", "Comment", true); PdfUi.Actions(p, ("Update", "UpdateCommentCommand"), ("Delete", "DeleteAnnotationCommand"));
-        p.Children.Add(PdfUi.Label("Choose a review tool, then drag on the page. Text and note tools use the toolbar text."));
+        p.Children.Add(PdfUi.Label("Choose a review tool, then drag on the page. Text and note tools use the tool-settings text."));
         p.Children.Add(PdfUi.Label("REDACTION", true));
         p.Children.Add(PdfUi.Label("Marks are staging only. Apply removes content. Original files and undo history still retain prior content."));
         p.Children.Add(PdfUi.Button("Apply redactions", "ApplyRedactionsCommand")); p.Children.Add(PdfUi.Button("Clear marks", "ClearRedactionsCommand"));
@@ -42,7 +48,7 @@ public sealed class PdfInspectorPanels : UserControl
         PdfUi.Actions(p, ("Go", "FollowBookmarkCommand"), ("Back", "BackCommand"), ("Forward", "ForwardCommand"));
         PdfUi.Actions(p, ("Child", "InsertChildBookmarkCommand"), ("Rename", "RenameBookmarkCommand"), ("Delete", "DeleteBookmarkCommand"));
         p.Children.Add(PdfUi.Button("Bookmark current page", "AddBookmarkCommand"));
-        p.Children.Add(PdfUi.Label("New and renamed bookmarks use toolbar text."));
+        p.Children.Add(PdfUi.Label("New and renamed bookmarks use tool-settings text."));
         p.Children.Add(PdfUi.Label("LINKS", true)); p.Children.Add(PdfUi.List("NavigationLinks", "SelectedLink", "Document links", height:150));
         PdfUi.Actions(p, ("Follow", "FollowLinkCommand"), ("Copy URI", "CopyLinkCommand")); p.Children.Add(PdfUi.Button("Link selected region", "LinkSelectionCommand"));
         p.Children.Add(PdfUi.Label("Toolbar text sets the destination page. External links require confirmation."));

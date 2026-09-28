@@ -28,6 +28,9 @@ public static partial class BrowserTest
         var w = Workspace; var c = w.Viewport;
         using var scene = c.CaptureScene();
         writer.WriteStartObject();
+        writer.WriteString("section", w.Shell.Section.ToString()); writer.WriteBoolean("toolsOpen", w.Shell.ToolsVisible);
+        writer.WriteBoolean("pagesOpen", w.Shell.PagesVisible); writer.WriteBoolean("searchOpen", w.Shell.IsSearchOpen);
+        writer.WriteBoolean("compact", w.Shell.IsCompact); writer.WriteString("toolDraft", w.ToolText);
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
         writer.WriteString("viewportRevision", c.Document?.Id.ToString()); writer.WriteBoolean("rendering", c.IsRendering);
         writer.WriteNumber("viewportWidth", c.Viewport.Width); writer.WriteNumber("viewportHeight", c.Viewport.Height);
@@ -64,15 +67,21 @@ public static partial class BrowserTest
             writer.WriteStartObject(); writer.WriteString("name", e.Name);
             writer.WriteNumber("x", p.X); writer.WriteNumber("y", p.Y);
             writer.WriteNumber("width", e.ActualWidth); writer.WriteNumber("height", e.ActualHeight);
-            writer.WriteString("type", e.GetType().Name); writer.WriteEndObject();
+            writer.WriteString("type", e.GetType().Name); writer.WriteBoolean("visible", IsVisible(e)); writer.WriteEndObject();
         }
         writer.WriteEndArray();
     });
+    private static bool IsVisible(FrameworkElement element)
+    {
+        for (DependencyObject? current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is UIElement ui && ui.Visibility != Visibility.Visible) return false;
+        return element.ActualWidth > 0 && element.ActualHeight > 0;
+    }
     [JSExport]
     public static string Thumbnails() => Json(writer =>
     {
         writer.WriteStartArray();
-        foreach (var thumbnail in Elements().OfType<PdfThumbnail>().Where(e => e.IsLoaded && e.ActualHeight > 0))
+        foreach (var thumbnail in Elements().OfType<PdfThumbnail>().Where(e => e.IsLoaded && e.ActualHeight > 0 && IsVisible(e)))
         {
             var p = thumbnail.TransformToVisual(_editor).TransformPoint(new Windows.Foundation.Point(0, 0));
             writer.WriteStartObject(); writer.WriteNumber("page", thumbnail.PageNumber);
@@ -86,8 +95,9 @@ public static partial class BrowserTest
     [JSExport]
     public static async Task Click(string name)
     {
-        if (Find(name) is not Button b || b.Command is not PdfUiCommand command || !command.CanExecute(null)) throw new InvalidOperationException("Bound command unavailable: " + name);
-        await command.ExecuteAsync(); await _runtime!.Viewport.WaitForRenderingAsync();
+        if (Find(name) is not Button b || b.Command is not { } command || !command.CanExecute(b.CommandParameter)) throw new InvalidOperationException("Bound command unavailable: " + name);
+        if (command is PdfUiCommand edit) await edit.ExecuteAsync(); else command.Execute(b.CommandParameter);
+        await _runtime!.Viewport.WaitForRenderingAsync();
     }
     [JSExport]
     public static void Text(string name, string value)
@@ -97,8 +107,8 @@ public static partial class BrowserTest
     {
         if (name == "InspectorSection")
         {
-            var choice = Elements().OfType<ComboBox>().Single(e => Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(e) == name);
-            choice.SelectedIndex = index; return;
+            if ((uint)index >= 8) throw new ArgumentOutOfRangeException(nameof(index));
+            Workspace.Shell.ShowSection((PdfShellSection)(index + 1)); return;
         }
         if (Find(name) is not ComboBox box) throw new ArgumentException("Choice not found: " + name); box.SelectedIndex = index;
     }

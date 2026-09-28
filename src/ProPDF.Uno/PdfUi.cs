@@ -9,7 +9,7 @@ internal static class PdfUi
     internal static StackPanel Stack(bool horizontal = false) => new() { Orientation = horizontal ? Orientation.Horizontal : Orientation.Vertical, Spacing = 6 };
     internal static TextBlock Label(string text, bool heading = false) => new() { Text = text, FontSize = heading ? 12 : 11,
         FontWeight = heading ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal,
-        Foreground = Brush(0x52627C), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, heading ? 12 : 2, 0, 4) };
+        Foreground = Brush(0x686868), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, heading ? 12 : 2, 0, 4) };
     internal static Button Button(string text, string command)
     {
         var button = new Button { Content = text, Name = command.Replace("Command", "Button", StringComparison.Ordinal),

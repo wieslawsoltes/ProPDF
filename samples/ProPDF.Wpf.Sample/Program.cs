@@ -11,7 +11,7 @@ internal static class Program
         var application = new Application();
         var runtime = new DemoWorkspace(action => application.Dispatcher.BeginInvoke(action));
         var editor = new PdfEditor { Context = runtime.Context };
-        var window = new Window { Title = "ProPDF — PDF editor", Width = 1450, Height = 960, MinWidth = 900, MinHeight = 640, Content = editor };
+        var window = new Window { Title = "ProPDF — PDF editor", Width = 1450, Height = 960, MinWidth = 640, MinHeight = 480, Content = editor };
         var loaded = false;
         var closing = false;
         var approved = false;

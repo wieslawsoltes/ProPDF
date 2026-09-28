@@ -43,7 +43,7 @@ public sealed class PdfScene : IDisposable
         try
         {
             canvas.ClipRect(new SKRect(0, 0, (float)Viewport.Width, (float)Viewport.Height));
-            using var paint = new SKPaint { IsAntialias = true, Color = new SKColor(235, 239, 246) };
+            using var paint = new SKPaint { IsAntialias = true, Color = new SKColor(232, 232, 232) };
             canvas.DrawRect(0, 0, (float)Viewport.Width, (float)Viewport.Height, paint);
             foreach (var page in _pages)
             {
@@ -55,7 +55,7 @@ public sealed class PdfScene : IDisposable
                 canvas.DrawRect(rect, paint);
                 paint.Style = SKPaintStyle.Stroke;
                 paint.StrokeWidth = 1;
-                paint.Color = new SKColor(203, 211, 224);
+                paint.Color = new SKColor(205, 205, 205);
                 canvas.DrawRect(rect, paint);
             }
             paint.Style = SKPaintStyle.Fill;

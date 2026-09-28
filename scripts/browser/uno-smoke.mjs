@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { waitForReopenedDocument } from './presentation.mjs';
+import { verifyWorkspaceChrome } from './workspace-ui.mjs';
 import { standardFontPdf, inspectStandardFontImage, verifyDensityTransition } from './rendering-quality.mjs';
 const base = process.env.PROPDF_URL || 'http://127.0.0.1:4173/ProPDF/';
 const out = process.env.PROPDF_QA || 'artifacts/browser';
@@ -53,10 +54,18 @@ async function healthy() {
   const current = await state();
   assert.equal(current.error, null); assert.equal(current.busy, false); return current;
 }
+async function pointer(name) {
+  await page.waitForFunction(name => JSON.parse(propdfTest.Controls()).some(c => c.name === name && c.visible && c.width > 0 && c.height > 0), name);
+  const c = await page.evaluate(name => JSON.parse(propdfTest.Controls()).find(c => c.name === name && c.visible), name);
+  await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
+}
 async function section(index) {
   await progress(`inspector ${index}`);
-  await bounded(page.evaluate(index => propdfTest.Choose('InspectorSection', index), index), 'inspector');
-  await page.waitForTimeout(120);
+  await pointer('AllToolsButton');
+  const name = ['Edit','Review','Forms','Navigate','Export','Document','Organize','Redact'][index];
+  await page.waitForFunction(() => JSON.parse(propdfTest.State()).section === 'AllTools');
+  await pointer('Tool' + name + 'Button');
+  await page.waitForFunction(name => JSON.parse(propdfTest.State()).section === name, name);
 }
 async function download(name, filename) {
   const pending = page.waitForEvent('download');
@@ -127,6 +136,8 @@ try {
   assert.ok(painted > 1000, 'The real browser screenshot must show PDF content, not a blank canvas or splash.');
   checks.push('composited editor screenshot contains rendered PDF pixels');
   await progress('rendered page thumbnails and pointer navigation');
+  await pointer('PagesPaneButton');
+  await page.waitForFunction(() => JSON.parse(propdfTest.State()).pagesOpen);
   await page.waitForFunction(() => JSON.parse(propdfTest.Thumbnails()).some(t => t.page === 2), null, { timeout: 15000 });
   const thumbnails = JSON.parse(await bounded(page.evaluate(() => propdfTest.Thumbnails()), 'thumbnail geometry'));
   const firstThumbnail = thumbnails.find(t => t.page === 1), secondThumbnail = thumbnails.find(t => t.page === 2);
@@ -164,8 +175,11 @@ try {
     const s = JSON.parse(propdfTest.State()); return s.error || (s.revision !== revision && !s.busy);
   }, initial.revision, { timeout: 15000 });
   await healthy(); await command('UndoButton'); assert.equal((await state()).dirty, false); checks.push('pointer page rotation and undo');
+  await pointer('FindPaneButton');
+  await page.waitForFunction(() => JSON.parse(propdfTest.State()).searchOpen);
   await text('SearchQueryInput', 'workspace'); await command('SearchButton'); assert.ok((await state()).matches > 0);
   await text('SearchQueryInput', ''); await command('SearchButton'); checks.push('search and clearing highlights');
+  await pointer('CloseSearchButton');
   await section(0); await command('EditObjectsButton');
   let objects = await objectsForSelection('content inspection');
   const first = objects.find(o => o.text === 'Your documents.'), second = objects.find(o => o.text === 'Your workspace.');
@@ -275,11 +289,15 @@ try {
   checks.push('correct punctuation proportions and distinct bold outline through actual PDF import/export');
   await openPdf(pdf); assert.equal((await state()).pages, 3);
   assert.ok((await bounded(page.evaluate(() => propdfTest.TextContent()), 'reopened document text')).includes('Your documents.'));
+  if ((await state()).pagesOpen) await pointer('PagesPaneButton');
+  await pointer('CloseToolsButton');
   await page.setViewportSize({ width: 800, height: 900 });
   await progress('reopened document compositor presentation');
   const presentation = await waitForReopenedDocument(page, `${out}/uno-narrow.png`);
   await writeFile(`${out}/presentation.json`, JSON.stringify(presentation, null, 2));
   assert.ok((await state()).tiles > 0); checks.push('responsive narrow viewport presents the reopened PDF, not the previous fixture');
+  await verifyWorkspaceChrome(page, out, state, pointer);
+  checks.push('task catalog, quick tools, panel dismissal, compact overlay drawers and unchanged PDF revision');
   await progress('high-DPI viewport and thumbnail density-only transition');
   await verifyDensityTransition(browser,base,out);
   checks.push('Retina and fractional-density viewport/thumbnail rasterization with density-only changes');

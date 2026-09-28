@@ -83,7 +83,7 @@ export async function verifyDensityTransition(browser, base, out) {
           // The PDF panel must keep its logical geometry, not merely exist somewhere
           // in a stale-size compositor buffer. The app header must remain at the top.
           for(let y=Math.ceil(180*density);y<image.height-50*density;y++)
-            for(let x=0;x<image.width-325*density;x++) {
+            for(let x=0;x<image.width-250*density;x++) {
               const i=(y*image.width+x)*4;
               if(Math.abs(pixels[i]-24)<4 && Math.abs(pixels[i+1]-43)<4 && Math.abs(pixels[i+2]-79)<4) {
                 count++;left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
@@ -92,7 +92,7 @@ export async function verifyDensityTransition(browser, base, out) {
           for(let y=Math.ceil(4*density);y<12*density;y++)
             for(let x=Math.ceil(4*density);x<80*density;x++) {
               const i=(y*image.width+x)*4;headerSamples++;
-              if(Math.abs(pixels[i]-18)<4 && Math.abs(pixels[i+1]-33)<4 && Math.abs(pixels[i+2]-61)<4)header++;
+              if(Math.abs(pixels[i]-245)<4 && Math.abs(pixels[i+1]-245)<4 && Math.abs(pixels[i+2]-245)<4)header++;
             }
           return {navyPixels:count,headerFraction:header/headerSamples,
             bounds:{left:left/density,top:top/density,right:(right+1)/density,bottom:(bottom+1)/density}};
@@ -121,6 +121,7 @@ export async function verifyDensityTransition(browser, base, out) {
       },density,{timeout:30000});
       return page.evaluate(()=>({state:JSON.parse(propdfTest.State()),thumbnails:JSON.parse(propdfTest.Thumbnails())}));
     }
+    await page.evaluate(async () => { await propdfTest.Click('CloseToolsButton'); await propdfTest.Click('PagesPaneButton'); });
     const retina=await settled(2);assert.equal(retina.state.error,null);
     await page.locator('.uno-loader').waitFor({state:'hidden',timeout:15000});
     const retinaFrame=await capture(2,`${out}/uno-density-2.png`);

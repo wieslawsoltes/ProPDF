@@ -13,7 +13,7 @@ public sealed class PdfOutputToolbar : Border
 {
     public PdfOutputToolbar()
     {
-        Background = new SolidColorBrush(Color.Parse("#F0F4FD"));
+        Background = new SolidColorBrush(Color.Parse("#FFFFFF"));
         BorderBrush = new SolidColorBrush(Color.Parse("#DDE3ED"));
         BorderThickness = new Thickness(0, 0, 0, 1);
         Padding = new Thickness(8, 4);
@@ -59,17 +59,4 @@ public sealed class PdfOutputToolbar : Border
         panel.Children.Add(summary);
     }
 
-    internal static void Install(PdfEditor owner)
-    {
-        if (owner.Content is not Grid grid || grid.Children.OfType<PdfOutputToolbar>().Any()) return;
-        foreach (var child in grid.Children)
-        {
-            var row = Grid.GetRow(child);
-            if (row >= 3) Grid.SetRow(child, row + 1);
-        }
-        grid.RowDefinitions.Insert(3, new RowDefinition(GridLength.Auto));
-        var toolbar = new PdfOutputToolbar();
-        Grid.SetRow(toolbar, 3);
-        grid.Children.Add(toolbar);
-    }
 }

@@ -5,4 +5,6 @@
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Skia" />
   </ItemGroup>
+  <PropertyGroup><DefineConstants>$(DefineConstants);PROPDF_AVALONIA</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="../Shared/PdfEditorChrome.cs" Link="PdfEditorChrome.cs" /></ItemGroup>
 </Project>

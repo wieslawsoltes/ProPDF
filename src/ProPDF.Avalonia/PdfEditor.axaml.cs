@@ -15,11 +15,20 @@ public sealed partial class PdfEditor : UserControl
     public static readonly StyledProperty<PdfEditorContext?> ContextProperty = AvaloniaProperty.Register<PdfEditor, PdfEditorContext?>(nameof(Context));
     public PdfEditorContext? Context { get => GetValue(ContextProperty); set => SetValue(ContextProperty, value); }
     public PdfWorkspace? Workspace { get; private set; }
+    private readonly PdfEditorChrome _chrome;
+    public PdfView View { get; } = new();
     public PdfEditor()
     {
         AvaloniaXamlLoader.Load(this);
-        PdfOutputToolbar.Install(this);
-        PdfNavigationPanel.Install(this);
+        var inspector = (TabControl)Content!;
+        Content = null;
+        var pages = new ListBox { Name = "PagesList", Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            ItemTemplate = (global::Avalonia.Controls.Templates.IDataTemplate)Resources["PageThumbnailTemplate"]! };
+        pages.Bind(ItemsControl.ItemsSourceProperty, new global::Avalonia.Data.Binding("Pages"));
+        pages.Bind(ListBox.SelectedItemProperty, new global::Avalonia.Data.Binding("SelectedPage") { Mode = global::Avalonia.Data.BindingMode.TwoWay });
+        global::Avalonia.Automation.AutomationProperties.SetName(pages, "Document pages");
+        _chrome = new PdfEditorChrome(inspector, pages, View, index => inspector.SelectedIndex = index);
+        Content = _chrome.Root;
     }
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -30,7 +39,7 @@ public sealed partial class PdfEditor : UserControl
     {
         Workspace?.Dispose();
         Workspace = Context is { } context ? new PdfWorkspace(context, new Dialogs(this), action => Dispatcher.UIThread.Post(action)) : null;
-        DataContext = Workspace;
+        DataContext = Workspace; View.Controller = Context?.Viewport; _chrome.Connect(Workspace);
     }
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -39,7 +48,7 @@ public sealed partial class PdfEditor : UserControl
     }
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        Workspace?.Dispose(); Workspace = null; DataContext = null;
+        _chrome.Connect(null); Workspace?.Dispose(); Workspace = null; DataContext = null; View.Controller = null;
         base.OnDetachedFromVisualTree(e);
     }
 

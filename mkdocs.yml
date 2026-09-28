@@ -35,6 +35,7 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Uno Platform: uno-platform.md
+  - Document workspace: workspace-ui.md
   - Getting started: getting-started.md
   - Feature matrix: features.md
   - Owned PDF engine: owned-engine.md

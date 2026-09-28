@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-alpha.8 — Unreleased
+
+Document-first sample workspace across Avalonia, WPF and Uno, using a single linked native-chrome implementation and framework-independent shell state. Task catalog and contextual inspectors replace stacked toolbars; quick annotation palette, right navigation rail, collapsible page thumbnails, dismissible search, file menu, and persistent responsive overlay drawers retain existing editing commands. Original vector icons, descriptive automation labels and keyboard navigation require no new dependencies or fonts. Shell state, native bound commands and actual browser pointer/keyboard workflows validate navigation without mutating PDF revisions. See `docs/workspace-ui.md`.
+
 ## 0.1.0-alpha.7 — Unreleased
 
 Browser density-only transitions synchronize the Uno canvas and managed viewport through an owned event-driven host observer. Regressions require stable compositor geometry as well as high-resolution tiles and thumbnails.
