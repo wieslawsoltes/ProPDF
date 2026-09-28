@@ -17,3 +17,7 @@ No fonts, PDF fixtures, private keys or upstream project signing key are importe
 ## Maintenance
 
 Review upgrades against the pinned commit and this hash inventory, preserve notices, and run source-inventory, pixel, native UI and external-package checks. The inventory detects accidental additions/removals/edits; it is not a signature or security audit. This patch fixes the covered image paths, not every PDF transparency, group, color-management, font, codec or conformance case.
+
+## Host font catalogs and paint identity (alpha.7)
+
+`SkiaPageFactory.cs` associates an immutable caller catalog with each parser via its ParsingOptions identity. `SkiaFontCache.Font.cs` resolves explicit family/style aliases to document-owned native typefaces, reuses them, checks complete Unicode coverage and releases them on disposal. The catalog implementation is separate ProPDF-owned code; no font program is included in these sources. `SKPaintCache.cs` compares full color/stroke/dash/blend keys and snapshots dash arrays on cache misses instead of treating a 32-bit hash as identity. Original upstream hashes and license notices are retained.

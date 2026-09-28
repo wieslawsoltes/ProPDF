@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SkiaSharp;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Graphics.Colors;
@@ -26,7 +27,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
     {
         private readonly bool _isAntialias;
 
-        private readonly Dictionary<int, SKPaint> _cache = new();
+        private readonly Dictionary<PaintKey, SKPaint> _cache = new();
         private readonly Dictionary<(bool, BlendMode), SKPaint> _imagePaintCache = new();
 
 #if PROPDF_RENDER_DIAGNOSTICS
@@ -49,10 +50,32 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
 #endif
         }
 
-        private static int GetPaintKey(IColor color, double alpha, bool stroke, float? strokeWidth, LineJoinStyle? joinStyle,
-            LineCapStyle? capStyle, LineDashPattern? dashPattern, BlendMode blendMode)
+        // Hash codes only select a dictionary bucket. They are never paint identity:
+        // different PDF colors and dash sequences can have identical 32-bit hashes.
+        private readonly record struct PaintKey(IColor Color, double Alpha, bool Stroke, float? Width,
+            LineJoinStyle? Join, LineCapStyle? Cap, DashKey Dashes, SKBlendMode Blend);
+
+        private readonly struct DashKey : IEquatable<DashKey>
         {
-            return HashCode.Combine(color, alpha, stroke, strokeWidth, joinStyle, capStyle, GetHash(dashPattern), blendMode);
+            private readonly int _phase;
+            private readonly IReadOnlyList<double>? _lengths;
+            public DashKey(LineDashPattern? pattern) { _phase = pattern?.Phase ?? 0; _lengths = pattern?.Array; }
+            private DashKey(int phase, double[]? lengths) { _phase = phase; _lengths = lengths; }
+            public DashKey Freeze() => new(_phase, _lengths?.ToArray());
+            public bool Equals(DashKey other)
+            {
+                if (_phase != other._phase || (_lengths?.Count ?? 0) != (other._lengths?.Count ?? 0)) return false;
+                for (var i = 0; i < (_lengths?.Count ?? 0); i++)
+                    if (!_lengths![i].Equals(other._lengths![i])) return false;
+                return true;
+            }
+            public override bool Equals(object? other) => other is DashKey key && Equals(key);
+            public override int GetHashCode()
+            {
+                var hash = new HashCode(); hash.Add(_phase);
+                if (_lengths is not null) foreach (var length in _lengths) hash.Add(length);
+                return hash.ToHashCode();
+            }
         }
 
         public SKPaint GetPaint(IColor? color, double alpha, bool stroke, float? strokeWidth, LineJoinStyle? joinStyle,
@@ -61,15 +84,8 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
             if (stroke && (!strokeWidth.HasValue || !joinStyle.HasValue || !capStyle.HasValue || !dashPattern.HasValue))
                 throw new ArgumentException("A stroke requires width, join, cap and dash parameters.");
             color ??= RGBColor.Black;
-            var key = GetPaintKey(color, alpha, stroke, strokeWidth, joinStyle, capStyle, dashPattern, blendMode);
-
-            if (skBlendModeOverride.HasValue)
-            {
-                // The override is a raw Skia blend mode that has no PDF BlendMode equivalent (e.g.
-                // SKBlendMode.Src for the knockout stroke of an atomic fill+stroke). Fold it into the
-                // key so it never aliases a normal cached paint.
-                key = HashCode.Combine(key, skBlendModeOverride.Value);
-            }
+            var key = new PaintKey(color, alpha, stroke, strokeWidth, joinStyle, capStyle,
+                new DashKey(dashPattern), skBlendModeOverride ?? blendMode.ToSKBlendMode());
 
             if (_cache.TryGetValue(key, out var paint))
             {
@@ -93,24 +109,10 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
                 paint.PathEffect = dashPattern.GetValueOrDefault().ToSKPathEffect();
             }
 
-            _cache[key] = paint;
+            // Copy a possibly caller-owned dash array only on a miss, not every glyph/path lookup.
+            _cache[key with { Dashes = key.Dashes.Freeze() }] = paint;
 
             return paint;
-        }
-
-        private static int GetHash(LineDashPattern? dashPattern)
-        {
-            if (!dashPattern.HasValue)
-            {
-                return 0;
-            }
-
-            int key = dashPattern.Value.Phase;
-            for (int n = 0; n < dashPattern.Value.Array.Count; n++)
-            {
-                key = (key * 31) ^ dashPattern.Value.Array[n].GetHashCode();
-            }
-            return key;
         }
 
         public SKPaint GetPaint(IPdfImage pdfImage, BlendMode blendMode)

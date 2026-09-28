@@ -12,6 +12,10 @@ namespace ProPDF.Engine.PdfPig;
 /// <summary>Each extraction operation has its own parser; rendering parsers are owned by the renderer's serial worker.</summary>
 public sealed class PdfPigBackend : IPdfDocumentLoader, IPdfTextService, ISkiaPdfDocumentFactory
 {
+    private readonly PdfFontCatalog? _fonts;
+    public PdfFontCatalog? Fonts => _fonts;
+    public PdfPigBackend() { }
+    public PdfPigBackend(PdfFontCatalog fonts) => _fonts = fonts ?? throw new ArgumentNullException(nameof(fonts));
     public async Task<PdfSnapshot> OpenAsync(Stream source, PdfOpenOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new PdfOpenOptions();
@@ -39,7 +43,7 @@ public sealed class PdfPigBackend : IPdfDocumentLoader, IPdfTextService, ISkiaPd
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    public ISkiaPdfDocument Open(PdfSnapshot snapshot) => new RenderDocument(snapshot);
+    public ISkiaPdfDocument Open(PdfSnapshot snapshot) => new RenderDocument(snapshot, _fonts);
 
     public Task<PdfTextPage> GetPageTextAsync(PdfSnapshot source, int pageNumber, CancellationToken cancellationToken = default)
     {
@@ -116,12 +120,14 @@ public sealed class PdfPigBackend : IPdfDocumentLoader, IPdfTextService, ISkiaPd
     {
         private readonly Stream _stream;
         private readonly PigDocument _document;
-        public RenderDocument(PdfSnapshot source)
+        public RenderDocument(PdfSnapshot source, PdfFontCatalog? fonts)
         {
             _stream = source.OpenRead();
             try
             {
-                _document = PigDocument.Open(_stream, Options(source.GetPassword()));
+                var options = Options(source.GetPassword());
+                if (fonts is not null) SkiaPageFactory.RegisterFonts(options, fonts);
+                _document = PigDocument.Open(_stream, options);
                 _document.AddSkiaPageFactory();
             }
             catch { _stream.Dispose(); throw; }

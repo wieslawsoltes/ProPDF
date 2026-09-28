@@ -9,9 +9,10 @@ namespace ProPDF.SampleSupport;
 /// <summary>Shared application composition and generated sample document. No confidential PDFs, fonts or keys are bundled.</summary>
 public sealed class DemoWorkspace : IAsyncDisposable
 {
-    public DemoWorkspace(Action<Action>? dispatch = null)
+    public DemoWorkspace(Action<Action>? dispatch = null) : this(dispatch, null) { }
+    public DemoWorkspace(Action<Action>? dispatch, PdfFontCatalog? fonts)
     {
-        Backend = new PdfPigBackend();
+        Backend = fonts is null ? new PdfPigBackend() : new PdfPigBackend(fonts);
         Editor = new ManagedPdfEditor(Backend);
         Session = new PdfSession(Backend, Editor);
         Renderer = new SkiaPdfRenderer(Backend);

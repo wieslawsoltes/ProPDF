@@ -14,6 +14,7 @@ public sealed class PdfView : UserControl
     private readonly ScrollBar _vertical = new() { Orientation = Orientation.Vertical, Width = 12, MinWidth = 0 };
     private readonly ScrollBar _horizontal = new() { Orientation = Orientation.Horizontal, Height = 12, MinHeight = 0 };
     private bool _syncing, _captured, _queued;
+    private XamlRoot? _root;
     public PdfViewportController? Controller { get => (PdfViewportController?)GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public PdfView()
     {
@@ -28,8 +29,8 @@ public sealed class PdfView : UserControl
         _input.SizeChanged += (_, _) => UpdateViewport();
         _vertical.ValueChanged += (_, _) => { if (!_syncing && Controller is { } c) c.SetOffset(c.Offset.X, _vertical.Value); };
         _horizontal.ValueChanged += (_, _) => { if (!_syncing && Controller is { } c) c.SetOffset(_horizontal.Value, c.Offset.Y); };
-        Loaded += (_, _) => { Subscribe(); UpdateViewport(); Refresh(); };
-        Unloaded += (_, _) => { Unsubscribe(); _captured = false; Controller?.CancelInteraction(); _surface.SetScene(null); };
+        Loaded += (_, _) => { _root = XamlRoot; if (_root is not null) _root.Changed += RootChanged; Subscribe(); UpdateViewport(); Refresh(); };
+        Unloaded += (_, _) => { if (_root is not null) _root.Changed -= RootChanged; _root = null; Unsubscribe(); _captured = false; Controller?.CancelInteraction(); _surface.SetScene(null); };
         _input.PointerPressed += Pressed; _input.PointerMoved += Moved; _input.PointerReleased += Released;
         _input.PointerCaptureLost += (_, _) => { _captured = false; Controller?.CancelInteraction(); };
         _input.PointerCanceled += (_, _) => { _captured = false; Controller?.CancelInteraction(); };
@@ -53,6 +54,7 @@ public sealed class PdfView : UserControl
     }
     private void Subscribe() { if (Controller is { } c) { c.Invalidated -= Invalidated; c.Invalidated += Invalidated; } }
     private void Unsubscribe() { if (Controller is { } c) c.Invalidated -= Invalidated; }
+    private void RootChanged(XamlRoot sender, XamlRootChangedEventArgs e) => UpdateViewport();
     private void UpdateViewport()
     {
         if (!IsLoaded || _input.ActualWidth < 1 || _input.ActualHeight < 1) return;
@@ -143,6 +145,7 @@ internal sealed class SceneSurface : SKCanvasElement
 {
     private readonly object _gate = new();
     private PdfScene? _scene;
+    public long RasterPixelCount { get { lock (_gate) return _scene?.RasterPixelCount ?? 0; } }
     public void SetScene(PdfScene? scene)
     {
         lock (_gate) { var previous = _scene; _scene = scene; previous?.Dispose(); }

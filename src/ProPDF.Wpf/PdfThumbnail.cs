@@ -16,6 +16,8 @@ public sealed class PdfThumbnail : FrameworkElement
     private long _generation;
     public PdfViewportController? Controller { get => (PdfViewportController?)GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public int PageNumber { get => (int)GetValue(PageNumberProperty); set => SetValue(PageNumberProperty, value); }
+    /// <summary>Pixels in the currently retained thumbnail, excluding allocation overhead.</summary>
+    public long RasterPixelCount => _scene?.RasterPixelCount ?? 0;
     public PdfThumbnail()
     {
         Width = 152; Height = 192;
@@ -47,7 +49,7 @@ public sealed class PdfThumbnail : FrameworkElement
         _request = request;
         try
         {
-            var scene = await controller.CreateThumbnailAsync(PageNumber, 152, 192, request.Token);
+            var scene = await controller.CreateThumbnailAsync(PageNumber, 152, 192, VisualTreeHelper.GetDpi(this).DpiScaleX, request.Token);
             if (!IsLoaded || generation != _generation) scene.Dispose();
             else { _scene = scene; InvalidateVisual(); }
         }
@@ -56,6 +58,8 @@ public sealed class PdfThumbnail : FrameworkElement
         catch (Exception error) { controller.ReportError(error); }
         finally { request.Dispose(); }
     }
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    { base.OnDpiChanged(oldDpi, newDpi); Reload(); }
     protected override void OnRender(DrawingContext context)
     {
         base.OnRender(context);

@@ -65,3 +65,7 @@ Warm immutable tiles can be leased independently of an occupied PDF interpreter 
 ## Typography update (alpha.6)
 
 Avalonia, WPF and Uno share eight supported Latin standard-font choices and line spacing for inserted text boxes and whole-text-object replacement. Replacement remains axis-aligned and restyles the entire object. The optional Skia interpreter fits substituted glyph advances to PDF widths and reuses bounded design-space outlines; embedded outlines are unchanged. See [Text rendering and typography](text-rendering.md). General complex-script paragraph shaping, rich reflow, font recovery and complete browser font fidelity are still not asserted.
+
+## Rendering fidelity qualification
+
+Alpha.7 adds host font catalogs, actual browser sans styles, density-aware tiled thumbnails/viewport updates, fractional edge composition and structural paint-cache identities. Synthetic font programs, deliberately colliding paint keys, multiple densities and browser punctuation/bold pixels are tested. These do not establish original-font recovery, all-font/codec coverage or physical-monitor/GPU qualification. See [text rendering](text-rendering.md) and [performance](performance.md).

@@ -39,3 +39,16 @@ behavior.
 ## Substitute glyph reuse
 
 The optional renderer caches substitute outlines in font-design coordinates, independently of font size, page zoom and tile scale. Each resolved typeface retains at most 256 Unicode/direction mappings and approximately 512 KiB of outlines. Oversized entries remain transient. A held outline lease remains valid after eviction or cache disposal. The glyph cache does not account for the entire font manager, shaper, parser or native allocation footprint; active leases can temporarily exceed its retained-cache budget. See [Text rendering and typography](text-rendering.md) for width fitting and qualification limits.
+
+
+## Display density and fractional tile edges
+
+The viewer separates logical DIPs from physical raster pixels. A display-density-only change invalidates the tile plan without changing document revision, logical zoom, scrolling or cached PDF display lists. Avalonia listens for top-level scaling changes, WPF handles DPI changes, and Uno listens for XamlRoot changes in addition to size changes. Native per-monitor hardware/driver behavior still needs physical-device testing.
+
+The new `CreateThumbnailAsync(page, width, height, pixelsPerDip, token)` overload draws density-aware previews while preserving DIP dimensions. The original overload retains its 1x behavior. High-density previews use bounded 512-pixel tiles rather than an unlimited full-page allocation. Maximum preview dimensions remain 512 DIPs, density is 0.5–8, and failed/cancelled generation releases all acquired tiles. Adapter thumbnails reload when density changes. At 2x density the same logical preview has approximately four times as many raster pixels, not a stretched 1x image. This costs corresponding raster/cache memory; it is not free supersampling.
+
+Page-edge tiles can have fractional pixel extents but require integer image allocation. Composition now uses the exact source extent instead of squeezing the rounded padding pixel into the logical page. The regression checks a known stripe's position rather than relying on a nonempty image. Linear sampling and the existing gutters remain; this is not a guarantee for every transparency group, unbounded filter or GPU compositor.
+
+## Exact paint-cache identity
+
+The attributed Skia interpreter previously used a 32-bit hash as the entire paint key. Distinct colors or dash sequences with the same hash could reuse the wrong native paint. Keys now compare the full color, alpha, stroke parameters, dash values and blend override. Dash arrays are snapshotted only on misses, so mutating caller-owned input cannot change a stored key. Repeated equal values reuse the existing native paint. Tests deliberately construct color/dash hash collisions and check output colors; this is a correctness repair, not a new ICC/color-management implementation.

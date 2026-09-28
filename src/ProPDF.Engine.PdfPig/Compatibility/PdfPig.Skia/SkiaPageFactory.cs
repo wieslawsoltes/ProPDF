@@ -37,6 +37,9 @@ namespace ProPDF.Engine.PdfPig.Compatibility;
 public sealed class SkiaPageFactory : BasePageFactory<SKPicture>, IDisposable
 {
     private readonly SkiaFontCache _fontCache;
+    // Per-parser configuration, not a mutable global fallback or asynchronous ambient state.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ParsingOptions, PdfFontCatalog> FontCatalogs = new();
+    internal static void RegisterFonts(ParsingOptions options, PdfFontCatalog fonts) => FontCatalogs.Add(options, fonts);
 
     private static readonly AsyncLocal<CancellationToken> _currentToken = new();
 
@@ -57,7 +60,7 @@ public sealed class SkiaPageFactory : BasePageFactory<SKPicture>, IDisposable
         ParsingOptions parsingOptions)
         : base(pdfScanner, resourceStore, filterProvider, pageContentParser, parsingOptions)
     {
-        _fontCache = new SkiaFontCache();
+        _fontCache = new SkiaFontCache(FontCatalogs.TryGetValue(parsingOptions, out var fonts) ? fonts : null);
     }
 
     /// <inheritdoc/>

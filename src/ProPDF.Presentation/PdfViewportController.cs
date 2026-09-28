@@ -58,6 +58,7 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
 
     public PdfSession Session { get; }
     public PdfSnapshot? Document { get { lock (_gate) return _snapshot; } }
+    public double PixelsPerDip { get { lock (_gate) return _pixelsPerDip; } }
     public double Zoom { get { lock (_gate) return _zoom; } }
     public PdfPoint Offset { get { lock (_gate) return _offset; } }
     public PdfSize Viewport { get { lock (_gate) return _viewport; } }
@@ -398,18 +399,40 @@ public sealed partial class PdfViewportController : INotifyPropertyChanged, IAsy
     private PdfRect ScreenBounds(PdfPagePlacement page, PdfRect bounds) => new(page.Bounds.X - _offset.X + bounds.X * _layout!.Scale,
         page.Bounds.Y - _offset.Y + bounds.Y * _layout.Scale, bounds.Width * _layout.Scale, bounds.Height * _layout.Scale);
 
-    public async Task<PdfScene> CreateThumbnailAsync(int pageNumber, double width = 160, double height = 200, CancellationToken cancellationToken = default)
+    public Task<PdfScene> CreateThumbnailAsync(int pageNumber, double width = 160, double height = 200, CancellationToken cancellationToken = default)
+        => CreateThumbnailAsync(pageNumber, width, height, 1, cancellationToken);
+
+    /// <summary>Rasterizes at the display density while preserving thumbnail dimensions in DIPs.
+    /// Large/high-density previews are tiled rather than allocated as unbounded page images.</summary>
+    public async Task<PdfScene> CreateThumbnailAsync(int pageNumber, double width, double height,
+        double pixelsPerDip, CancellationToken cancellationToken = default)
     {
-        if (!double.IsFinite(width) || !double.IsFinite(height) || width is < 16 or > 512 || height is < 16 or > 512)
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width is < 16 or > 512 || height is < 16 or > 512 ||
+            !double.IsFinite(pixelsPerDip) || pixelsPerDip is < 0.5 or > 8)
             throw new ArgumentOutOfRangeException(nameof(width));
         var document = Document ?? throw new InvalidOperationException("No PDF is open.");
         var page = document.GetPage(pageNumber);
         var scale = Math.Min((width - 12) / page.Size.Width, (height - 12) / page.Size.Height);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
-        var tile = await _renderer.RenderTileAsync(document, new SkiaTileRequest(pageNumber, new PdfRect(0, 0, page.Size.Width, page.Size.Height), scale), linked.Token).ConfigureAwait(false);
+        var rasterScale = scale * pixelsPerDip;
         var bounds = new PdfRect((width - page.Size.Width * scale) / 2, (height - page.Size.Height * scale) / 2,
             page.Size.Width * scale, page.Size.Height * scale);
-        return new PdfScene(new PdfSize(width, height), [new PdfPageVisual(pageNumber, bounds)], [new PdfTileVisual(tile, bounds)], []);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var tiles = new List<PdfTileVisual>();
+        try
+        {
+            for (var y = 0; y < page.Size.Height * rasterScale; y += 512)
+                for (var x = 0; x < page.Size.Width * rasterScale; x += 512)
+                {
+                    var clip = new PdfRect(x / rasterScale, y / rasterScale,
+                        Math.Min(512 / rasterScale, page.Size.Width - x / rasterScale),
+                        Math.Min(512 / rasterScale, page.Size.Height - y / rasterScale));
+                    using var tile = await _renderer.RenderTileAsync(document, new(pageNumber, clip, rasterScale), linked.Token).ConfigureAwait(false);
+                    tiles.Add(new PdfTileVisual(tile.Retain(), new(bounds.X + clip.X * scale, bounds.Y + clip.Y * scale,
+                        clip.Width * scale, clip.Height * scale)));
+                }
+            return new PdfScene(new PdfSize(width, height), [new PdfPageVisual(pageNumber, bounds)], tiles.ToArray(), []);
+        }
+        catch { foreach (var tile in tiles) tile.Tile.Dispose(); throw; }
     }
 
     public async Task WaitForRenderingAsync(CancellationToken cancellationToken = default)

@@ -29,6 +29,9 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
     internal sealed partial class SkiaFontCache : IDisposable
     {
         private static readonly object FontManagerLock = new();
+        private readonly PdfFontCatalog? _fontCatalog;
+        private readonly Dictionary<PdfFontFace, SkiaFontCacheItem> _provided = new();
+        public SkiaFontCache(PdfFontCatalog? fonts = null) => _fontCatalog = fonts;
 
         // Font family names known to the font manager, sorted ordinally so character-coverage
         // scanning is deterministic. Built lazily because the installed font set is stable for
@@ -73,6 +76,23 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
                 if (TryGetFontCacheItem(fontKey, unicode, codepoint, out item))
                 {
                     return item!;
+                }
+
+                var supplied = _fontCatalog?.FindFace(font.GetCleanFontName() ?? "", font.Details.IsBold, font.Details.IsItalic);
+                if (supplied is not null)
+                {
+                    if (!_provided.TryGetValue(supplied, out var provided))
+                    {
+                        var typeface = supplied.Open();
+                        try { provided = new SkiaFontCacheItem(typeface); }
+                        catch { typeface.Dispose(); throw; }
+                        _provided.Add(supplied, provided);
+                    }
+                    // Keep the explicit face first even when this first mapping is absent.
+                    // A broad system fallback used for that mapping must not shadow it later.
+                    var list = _typefaces.GetOrAdd(fontKey, _ => new List<SkiaFontCacheItem>());
+                    lock (list) if (!list.Contains(provided)) list.Insert(0, provided);
+                    if (string.IsNullOrWhiteSpace(unicode) || provided.Typeface.ContainsGlyphs(unicode)) return provided;
                 }
 
                 SKTypeface? currentTypeface;
@@ -215,7 +235,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
                     foreach (var cacheItem in skiaFontCacheItems)
                     {
                         // Find first font that can render char
-                        if (cacheItem.Typeface.ContainsGlyph(codepoint))
+                        if (cacheItem.Typeface.ContainsGlyphs(unicode))
                         {
                             item = cacheItem;
                             return true;
@@ -415,6 +435,9 @@ namespace ProPDF.Engine.PdfPig.Compatibility.Helpers
             }
 
             _typefaces.Clear();
+            foreach (var provided in _provided.Values) provided.Dispose();
+            _provided.Clear();
+            if (DefaultSkiaFontCacheItem.IsValueCreated) DefaultSkiaFontCacheItem.Value.Dispose();
         }
     }
 }
