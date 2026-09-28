@@ -6,6 +6,21 @@ import { writeFile } from 'node:fs/promises';
 export async function verifyWorkspaceChrome(page, out, state, pointer) {
   const revision = (await state()).revision;
   const layouts = [];
+  // Exercise retained catalog geometry repeatedly. A synchronous section change
+  // can precede the layout that moves catalog buttons after the settings row
+  // disappears. Every transition still requires one successful physical click.
+  await page.setViewportSize({ width: 1450, height: 960 });
+  let transitions = 0;
+  for (let cycle = 0; cycle < 8; cycle++) {
+    for (const section of ['Edit', 'Document', 'Export', 'Review']) {
+      await pointer('AllToolsButton');
+      await page.waitForFunction(() => JSON.parse(propdfTest.State()).section === 'AllTools');
+      await pointer('Tool' + section + 'Button');
+      await page.waitForFunction(section => JSON.parse(propdfTest.State()).section === section, section);
+      transitions++;
+    }
+  }
+  assert.equal((await state()).revision, revision, 'Repeated task routing must not modify the PDF.');
   for (const width of [1450, 800, 390]) {
     console.log(`Browser workspace layout: ${width} DIP`);
     await page.setViewportSize({width, height:900});
@@ -74,5 +89,5 @@ export async function verifyWorkspaceChrome(page, out, state, pointer) {
   await pointer('AllToolsButton'); await pointer('FitPageButton');
   await page.waitForFunction(() => { const s=JSON.parse(propdfTest.State()); return !s.rendering && s.tiles>0; });
   await page.screenshot({path:`${out}/workspace-all-tools.png`});
-  await writeFile(`${out}/workspace-ui.json`,JSON.stringify({revision,layouts},null,2));
+  await writeFile(`${out}/workspace-ui.json`,JSON.stringify({revision,transitions,layouts},null,2));
 }

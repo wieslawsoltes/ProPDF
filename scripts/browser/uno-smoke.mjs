@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { waitForReopenedDocument } from './presentation.mjs';
 import { verifyWorkspaceChrome } from './workspace-ui.mjs';
+import { clickNativeControl } from './native-pointer.mjs';
 import { standardFontPdf, inspectStandardFontImage, verifyDensityTransition } from './rendering-quality.mjs';
 const base = process.env.PROPDF_URL || 'http://127.0.0.1:4173/ProPDF/';
 const out = process.env.PROPDF_QA || 'artifacts/browser';
@@ -11,7 +12,7 @@ const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '-
 const context = await browser.newContext({ viewport: { width: 1600, height: 1050 }, acceptDownloads: true });
 const page = await context.newPage();
 page.setDefaultTimeout(20000);
-const errors = [], requests = [], checks = [], consoleMessages = [];
+const errors = [], requests = [], checks = [], consoleMessages = [], pointerTrace = [];
 let checkpoint = 'launch', lastState = null;
 function bounded(promise, label, milliseconds = 20000) {
   let timer;
@@ -55,9 +56,7 @@ async function healthy() {
   assert.equal(current.error, null); assert.equal(current.busy, false); return current;
 }
 async function pointer(name) {
-  await page.waitForFunction(name => JSON.parse(propdfTest.Controls()).some(c => c.name === name && c.visible && c.width > 0 && c.height > 0), name);
-  const c = await page.evaluate(name => JSON.parse(propdfTest.Controls()).find(c => c.name === name && c.visible), name);
-  await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
+  await clickNativeControl(page, name, pointerTrace);
 }
 async function section(index) {
   await progress(`inspector ${index}`);
@@ -308,12 +307,14 @@ try {
   await verifyDensityTransition(browser,base,out);
   checks.push('Retina and fractional-density viewport/thumbnail rasterization with density-only changes');
   assert.deepEqual(errors, [], 'No unhandled JavaScript failures'); assert.deepEqual(requests, [], 'No missing runtime assets');
+  await writeFile(`${out}/pointer-trace.json`, JSON.stringify(pointerTrace, null, 2));
   await writeFile(`${out}/results.json`, JSON.stringify({ checks, state: await state(), errors, requests }, null, 2));
   console.log(`PASS: ${checks.length} Uno browser workflows.`);
 } catch (error) {
   await page.screenshot({ path: `${out}/failure.png`, timeout: 4000 }).catch(() => {});
   const finalState = await state().catch(() => lastState);
   const finalControls = await page.evaluate(() => JSON.parse(propdfTest.Controls())).catch(() => []);
+  await writeFile(`${out}/pointer-trace.json`, JSON.stringify(pointerTrace, null, 2));
   await writeFile(`${out}/failure-controls.json`, JSON.stringify(finalControls, null, 2));
   await writeFile(`${out}/failure.json`, JSON.stringify({ checkpoint, error: String(error), stack: error.stack, errors, requests, consoleMessages, checks, state: finalState }, null, 2));
   throw error;
