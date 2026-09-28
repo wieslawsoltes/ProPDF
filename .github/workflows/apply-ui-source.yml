@@ -1,0 +1,40 @@
+name: Apply workspace UI source
+on:
+  push:
+    branches: [feature/acrobat-workspace-ui]
+    paths: ['.github/workflows/apply-ui-source.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'wieslawsoltes/ProPDF' && github.ref == 'refs/heads/feature/acrobat-workspace-ui'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: feature/acrobat-workspace-ui
+      - name: Verify and apply the exact source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python - <<'PY'
+          import pathlib,base64,lzma,hashlib,subprocess
+          encoded=''.join((pathlib.Path('.ui-transfer')/('part'+str(i))).read_text().strip() for i in range(4))
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert len(patch)==160970
+          assert hashlib.sha256(patch).hexdigest()=='7c6f24bf576dbf0b76ffae71f21ba579ea654161c760911d3c8a519558569f3a'
+          for line in patch.decode().splitlines():
+              if line.startswith('+++ b/'):
+                  path=pathlib.PurePosixPath(line[6:])
+                  assert not path.is_absolute() and '..' not in path.parts and '.git' not in path.parts
+                  assert not str(path).startswith('.github/workflows/')
+          target=pathlib.Path('/tmp/workspace-ui.patch'); target.write_bytes(patch)
+          subprocess.run(['git','apply','--check',str(target)],check=True)
+          subprocess.run(['git','apply','--index',str(target)],check=True)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(ui): shared document-first workspace across Avalonia WPF and Uno'
+          git push origin HEAD:refs/heads/feature/acrobat-workspace-ui
