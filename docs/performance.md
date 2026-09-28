@@ -52,3 +52,11 @@ Page-edge tiles can have fractional pixel extents but require integer image allo
 ## Exact paint-cache identity
 
 The attributed Skia interpreter previously used a 32-bit hash as the entire paint key. Distinct colors or dash sequences with the same hash could reuse the wrong native paint. Keys now compare the full color, alpha, stroke parameters, dash values and blend override. Dash arrays are snapshotted only on misses, so mutating caller-owned input cannot change a stored key. Repeated equal values reuse the existing native paint. Tests deliberately construct color/dash hash collisions and check output colors; this is a correctness repair, not a new ICC/color-management implementation.
+
+## Browser canvas density synchronization
+
+Uno 6.7.135 sizes its browser canvas on `window.resize`, while managed display information can detect a density-only change without that event. The sample's owned `display-density.mjs` observes a resolution media query and rearms it after each actual density change. It coalesces one ordinary resize notification on the next animation frame, allowing Uno's existing host path to resize both the native surface and the managed viewport. It does not poll, patch private runtime methods, change CSS dimensions, reset zoom, or reload the PDF. Ordinary resize events at unchanged density add no notification. The observer disposes on normal page exit and rechecks restored back/forward-cache pages.
+
+Browser tests change only device density, then require unchanged document/zoom/layout, scaled page/thumbnail pixel counts and the same independently observed PDF panel geometry. Captures use CDP directly because Playwright's screenshot helper can restore the original emulation settings. The bounded pixel gate checks header placement, logical bounds and area instead of accepting any nonempty frame. Desktop physical monitor transitions, Safari/Firefox and GPU-driver behavior still require separate qualification.
+
+Upstream host behavior: [Uno 6.7.135 BrowserRenderer](https://github.com/unoplatform/uno/blob/6.7.135/src/Uno.UI.Runtime.Skia.WebAssembly.Browser/ts/Runtime/BrowserRenderer.ts).

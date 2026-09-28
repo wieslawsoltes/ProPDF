@@ -48,8 +48,8 @@ jobs:
         run: |
           npm install --ignore-scripts
           npx playwright install --with-deps chromium
-      - name: Deployment verifier regression tests
-        run: node --test scripts/browser/deployment.test.mjs
+      - name: Deployment and display-density regression tests
+        run: node --test scripts/browser/deployment.test.mjs scripts/browser/display-density.test.mjs
       - name: Actual browser workflow validation
         shell: bash
         run: |

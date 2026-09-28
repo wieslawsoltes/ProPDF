@@ -1,4 +1,7 @@
+import { observeDisplayDensity } from './display-density.mjs';
+
 // ProPDF-owned browser boundary. Document bytes stay in this tab; no upload, analytics or automatic persistence.
+observeDisplayDensity(window);
 let dirty = false;
 export function setDirty(value) { dirty = value; }
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
