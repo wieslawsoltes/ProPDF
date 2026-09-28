@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.0-alpha.6 — Unreleased
+
+Fit non-embedded substitute glyph advances to explicit PDF widths without changing text positioning or saved bytes. Reuse bounded, reference-counted, design-space glyph outlines across font sizes and zoom levels; preserve fill/stroke/text-clip behavior and resolved default-family styles. Add shared standard-font and line-spacing controls for native text insertion and whole-object replacement in Avalonia, WPF and Uno. Independent fallback-width pixel fixtures, Unicode/cache-lifetime regressions, atomic typography validation and native/browser control round trips. No font files or new dependencies; source-pinned Apache-2.0 interpreter modifications remain attributed and hash-inventoried. See `docs/text-rendering.md`.
+
 ## 0.1.0-alpha.5 — Unreleased
 
 Independent warm-tile cache leasing avoids waiting behind unrelated interpreter work. Stable viewport tile plans avoid redundant scroll cancellation/submission, progressive publication retains matching visible tiles, and dispatcher notifications coalesce. Adds page- and region-relative whole-selection alignment across Avalonia, WPF and Uno, with atomic undo and cropped/rotated coordinates. Deterministic concurrency, cache lifetime, scheduling and native command regression coverage; no new dependencies or GPU/Acrobat speed claims. See `docs/performance.md` and `docs/content-editing.md`. Uno page lists now read revision and page entries from one immutable snapshot, fixing empty thumbnails when notifications arrive ahead of workspace refresh. Browser validation checks thumbnail pixels and pointer navigation, and awaits exact native list identity after undo.

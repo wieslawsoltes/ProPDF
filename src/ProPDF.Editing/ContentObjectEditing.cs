@@ -331,7 +331,7 @@ public sealed partial class ManagedPdfEditor : IPdfContentService
             case ReplaceContentText text:
                 if (node.Kind != PdfContentObjectKind.Text) throw new ArgumentException("Only a text object can be replaced as text.");
                 // Author at the original paint position, under the original clipping stack. Isolate authored state.
-                var authored = CreateTextBox(graph, new AddTextBox(handle.PageNumber, text.Bounds, text.Text, text.FontSize, Alignment: text.Alignment,
+                var authored = CreateTextBox(graph, new AddTextBox(handle.PageNumber, text.Bounds, text.Text, text.FontSize, LineSpacing: text.LineSpacing, Alignment: text.Alignment,
                     StandardFont: text.StandardFont, Color: text.Color, EmbeddedFont: text.EmbeddedFont), token);
                 Commands("q\n" + MatrixCommand(node.StartMatrix.Inverse()) + authored + "Q\n"); replacement.AddRange(node.StateEffects); break;
             default: throw new NotSupportedException("Unknown content-object operation.");

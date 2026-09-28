@@ -64,5 +64,5 @@ public sealed record AddTextBox(int PageNumber, PdfRect Bounds, string Text, dou
     : PdfEditOperation(PdfCapability.ContentInsertion, "Insert wrapped text box");
 /// <summary>Replaces an entire text object with a wrapped, axis-aligned text box; other page content is preserved.</summary>
 public sealed record ReplaceContentText(PdfContentObjectReference Object, PdfRect Bounds, string Text, double FontSize = 14,
-    PdfTextAlignment Alignment = PdfTextAlignment.Left, string StandardFont = "Helvetica", PdfColor? Color = null, PdfBinaryAsset? EmbeddedFont = null)
+    PdfTextAlignment Alignment = PdfTextAlignment.Left, string StandardFont = "Helvetica", PdfColor? Color = null, PdfBinaryAsset? EmbeddedFont = null, double LineSpacing = 1.2)
     : PdfContentObjectEdit(Object, "Replace existing text object");

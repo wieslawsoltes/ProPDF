@@ -12,7 +12,7 @@ Owned .NET PDF kernel and editing libraries · SkiaSharp rendering · Avalonia �
 
 ---
 
-**Development preview — 0.1.0-alpha.5.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
+**Development preview — 0.1.0-alpha.6.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
 
 ## Reusable libraries
 
@@ -129,3 +129,7 @@ Owned redaction removes content groups rather than painting an overlay; conserva
 ProPDF-authored source is **MIT**. The optional interpreter contains attributed Apache-2.0 PdfPig/Skia source. Skia, Uno and runtime dependencies retain their own terms and notices. Explicit runtime selection excludes the restricted stock-host dependencies. Reviewed legacy manifests and complete legal texts are hash-checked. This is not legal certification of every native component. See [third-party notices](THIRD-PARTY-NOTICES.md).
 
 General rich-content reflow, nested editing, advanced typography, full browser crypto, OCR, conversion, production printing, comprehensive accessibility/conformance, prepress and enterprise collaboration remain work. [The feature matrix](docs/features.md) is the compatibility reference, not a claim of Acrobat equivalence.
+
+### Text rendering and typography
+
+Substitute-font outlines now fit the PDF glyph advances instead of mixing host widths with PDF positioning. A bounded outline cache reuses shapes across zoom/font sizes. All three editors expose eight supported Latin font faces and explicit line spacing for text insertion and whole-object replacement, with atomic overflow validation. This improves covered non-embedded-font cases; it does not recover the original font or implement general rich paragraph reflow. See [Text rendering](docs/text-rendering.md).

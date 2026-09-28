@@ -25,6 +25,8 @@ public sealed partial class PdfViewportController
     public PdfContentObject? SelectedContentObject { get { lock (_gate) return _selectedObject; } }
     public string ContentStatus { get { lock (_gate) return _contentError ?? (!_contentTask.IsCompleted ? "Reading page objects…" : _selectedObject?.ReadOnlyReason ?? $"{_contentPage?.Objects.Count ?? 0} objects · Bounds are approximate"); } }
     public double TextBoxFontSize { get; set; } = 14;
+    public string TextBoxStandardFont { get; set; } = "Helvetica";
+    public double TextBoxLineSpacing { get; set; } = 1.2;
     public PdfTextAlignment TextBoxAlignment { get; set; }
 
     public void ConfigureContentService(IPdfContentService? service)

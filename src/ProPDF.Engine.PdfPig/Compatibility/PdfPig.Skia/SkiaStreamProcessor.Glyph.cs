@@ -88,10 +88,12 @@ namespace ProPDF.Engine.PdfPig.Compatibility
 
         private void ShowVectorFontGlyph(SKPath path, IColor? strokingColor, IColor? nonStrokingColor,
             TextRenderingMode textRenderingMode, in TransformationMatrix renderingMatrix,
-            in TransformationMatrix textMatrix)
+            in TransformationMatrix textMatrix, float horizontalScale = 1)
         {
             var transformMatrix = renderingMatrix.ToSkMatrix()
                 .PostConcat(textMatrix.ToSkMatrix());
+            if (horizontalScale != 1)
+                transformMatrix = SKMatrix.CreateScale(horizontalScale, 1).PostConcat(transformMatrix);
 
             var currentState = GetCurrentState();
 
@@ -213,10 +215,23 @@ namespace ProPDF.Engine.PdfPig.Compatibility
                 }
             }
 
+            using var glyph = drawTypeface.Glyphs.Acquire(renderUnicode, font.IsVertical);
+            var widthScale = PdfFallbackGlyphCache.HorizontalScale(characterBoundingBox.Width, glyph.Advance, font.IsVertical);
+            if (glyph.Path is { } outline)
+            {
+                // Substitute fonts keep their outlines but use the displacement from the PDF,
+                // not host-specific metrics. Never alter an embedded outline or the text pen.
+                ShowVectorFontGlyph(outline, strokingColor, nonStrokingColor, textRenderingMode,
+                    in renderingMatrix, in textMatrix, widthScale);
+                return;
+            }
+
+            // Bitmap/color-only glyphs have no complete outline: retain the existing native text
+            // draw fallback, without pretending that a partial outline can supply text clipping.
             using var s = new SKAutoCanvasRestore(_canvas, true);
             _canvas.Concat(textMatrix.ToSkMatrix());
             _canvas.Concat(renderingMatrix.ToSkMatrix());
-            _canvas.Scale(1, -1, 0, 0);
+            _canvas.Scale(widthScale, -1, 0, 0);
 
             // PDF 1.7 §9.3.6: in rendering modes 4–7 the glyph outline contributes to the text
             // clipping path applied on ET. Capture it from the shaped Skia glyphs at the active
@@ -516,7 +531,7 @@ namespace ProPDF.Engine.PdfPig.Compatibility
                     uint glyphId = shaped.Codepoints[i];
                     SKPoint pos = shaped.Points[i];
 
-                    SKPath glyphPath = skFont.GetGlyphPath((ushort)glyphId); // Check for overflow?
+                    using SKPath glyphPath = skFont.GetGlyphPath(checked((ushort)glyphId));
                     if (glyphPath is not null)
                     {
                         var matrix = SKMatrix.CreateTranslation(pos.X, pos.Y);

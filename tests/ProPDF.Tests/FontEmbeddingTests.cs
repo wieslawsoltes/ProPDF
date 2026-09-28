@@ -64,7 +64,7 @@ public sealed class FontEmbeddingTests
             [new AddText(1, new PdfPoint(30, 60), "B", EmbeddedFont: font)]));
     }
 
-    private static class TinyTrueType
+    internal static class TinyTrueType
     {
         public static byte[] Create(ushort embeddingFlags = 0, bool format4 = false)
         {
