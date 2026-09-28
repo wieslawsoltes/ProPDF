@@ -12,7 +12,13 @@ Owned .NET PDF kernel and editing libraries · SkiaSharp rendering · Avalonia �
 
 ---
 
-**Development preview — 0.1.0-alpha.7.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
+**Development preview — 0.1.0-alpha.8.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
+
+## A document-first workspace
+
+All three sample apps now share an Acrobat-inspired, task-based workspace: a light document bar, **All tools** catalog, contextual inspectors, floating quick tools, right-side navigation rail, collapsible thumbnails, and a compact page/zoom bar. Narrow windows use overlay drawers instead of squeezing the PDF. Existing editor commands, undo, save confirmations, text/object panels and rendering remain shared; there are no placeholder cloud or AI buttons.
+
+See the [workspace guide](docs/workspace-ui.md) for tool locations, keyboard commands, responsive behavior and reuse. Original ProPDF branding and vector icons are used; no Adobe artwork, icon fonts, new dependencies or font binaries are included.
 
 ## Reusable libraries
 

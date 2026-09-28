@@ -25,4 +25,5 @@
   <Target Name="RequireReviewedUnoNotices" BeforeTargets="GenerateNuspec">
     <Error Condition="!Exists('$(UnoNoticeDirectory)/Uno-Eventing-LICENSE.txt') Or !Exists('$(UnoNoticeDirectory)/Uno-ICU-LICENSE.txt') Or !Exists('$(UnoNoticeDirectory)/ICU-77-LICENSE.txt')" Text="Run python scripts/fetch-uno-notices.py before packing. The full pinned Uno/ICU notices must accompany the package." />
   </Target>
+  <ItemGroup><Compile Include="../Shared/PdfEditorChrome.cs" Link="PdfEditorChrome.cs" /></ItemGroup>
 </Project>

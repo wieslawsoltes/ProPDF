@@ -13,19 +13,28 @@ public sealed partial class PdfEditor : UserControl
         new PropertyMetadata(null, (target, _) => ((PdfEditor)target).ResetWorkspace()));
     public PdfEditorContext? Context { get => (PdfEditorContext?)GetValue(ContextProperty); set => SetValue(ContextProperty, value); }
     public PdfWorkspace? Workspace { get; private set; }
+    private readonly PdfEditorChrome _chrome;
+    public PdfView View { get; } = new();
     public PdfEditor()
     {
         InitializeComponent();
-        PdfOutputToolbar.Install(this);
-        PdfNavigationPanel.Install(this);
+        var inspector = (TabControl)Content!;
+        Content = null;
+        var pages = new ListBox { Name = "PagesList", Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch, ItemTemplate = (DataTemplate)Resources["PageThumbnailTemplate"] };
+        pages.SetBinding(ItemsControl.ItemsSourceProperty, new System.Windows.Data.Binding("Pages"));
+        pages.SetBinding(ListBox.SelectedItemProperty, new System.Windows.Data.Binding("SelectedPage") { Mode = System.Windows.Data.BindingMode.TwoWay });
+        System.Windows.Automation.AutomationProperties.SetName(pages, "Document pages");
+        _chrome = new PdfEditorChrome(inspector, pages, View, index => inspector.SelectedIndex = index);
+        Content = _chrome.Root;
         Loaded += (_, _) => { if (Workspace is null && Context is not null) ResetWorkspace(); };
-        Unloaded += (_, _) => { Workspace?.Dispose(); Workspace = null; DataContext = null; };
+        Unloaded += (_, _) => { _chrome.Connect(null); Workspace?.Dispose(); Workspace = null; DataContext = null; View.Controller = null; };
     }
     private void ResetWorkspace()
     {
         Workspace?.Dispose();
         Workspace = Context is { } context ? new PdfWorkspace(context, new Dialogs(this), action => Dispatcher.BeginInvoke(action)) : null;
-        DataContext = Workspace;
+        DataContext = Workspace; View.Controller = Context?.Viewport; _chrome.Connect(Workspace);
     }
 
     private sealed class Dialogs(PdfEditor owner) : IPdfWorkspaceDialogs, IPdfExternalNavigation

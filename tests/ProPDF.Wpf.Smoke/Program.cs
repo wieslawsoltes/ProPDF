@@ -32,8 +32,10 @@ internal static class Program
             if (runtime.Session.Current!.Pages[0].Size.Width < runtime.Session.Current.Pages[0].Size.Height)
                 throw new InvalidOperationException("WPF rotate command did not update the document.");
             Pump(workspace.UndoCommand.ExecuteAsync());
+            workspace.Shell.ShowSection(ProPDF.Presentation.PdfShellSection.Edit);
+            Pump(Task.CompletedTask);
             var tabs = Descendants(editor).OfType<TabControl>().Single();
-            tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfNavigationPanel);
+            workspace.Shell.ShowSection(ProPDF.Presentation.PdfShellSection.Navigate);
             Pump(workspace.LoadNavigationAsync());
             if (workspace.NavigationBookmarks.Count != 3) throw new InvalidOperationException("Native bookmark inspector did not load.");
             workspace.SelectedBookmark = workspace.NavigationBookmarks[1];
@@ -44,9 +46,12 @@ internal static class Program
             application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             var follow = Descendants(editor).OfType<Button>().Single(button => button.Name == "FollowBookmarkButton");
             if (!ReferenceEquals(follow.Command, workspace.FollowBookmarkCommand)) throw new InvalidOperationException("WPF navigation command binding is missing.");
+            workspace.Shell.ShowSection(ProPDF.Presentation.PdfShellSection.Export);
+            Pump(Task.CompletedTask);
             var export = Descendants(editor).OfType<Button>().Single(button => button.Name == "ExportPngButton");
             if (!ReferenceEquals(export.Command, workspace.ExportPngCommand)) throw new InvalidOperationException("WPF output command binding is missing.");
-            tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(tab => tab.Content is PdfContentPanel);
+            workspace.Shell.ShowSection(ProPDF.Presentation.PdfShellSection.Edit);
+            Pump(Task.CompletedTask);
             Pump(workspace.EditObjectsCommand.ExecuteAsync());
             application.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             var editButton = Descendants(editor).OfType<Button>().Single(button => button.Name == "ApplyObjectBoundsButton");
@@ -159,6 +164,27 @@ internal static class Program
             ((Expander)contentPanel.FindName("TextSection")).IsExpanded = false;
             Pump(runtime.Viewport.LoadContentAsync());
             workspace.SelectContentObjects(workspace.ContentObjects.Where(item => item.Text is "Your documents." or "Your workspace."));
+            var chromeRevision = runtime.Session.Current!.Id;
+            var closeTools = Descendants(editor).OfType<Button>().Single(b => b.Name == "CloseToolsButton");
+            closeTools.Command!.Execute(closeTools.CommandParameter);
+            if (workspace.Shell.ToolsVisible) throw new InvalidOperationException("Close tools is not wired.");
+            var allTools = Descendants(editor).OfType<Button>().Single(b => b.Name == "AllToolsButton");
+            allTools.Command!.Execute(allTools.CommandParameter);
+            Pump(Task.CompletedTask);
+            var formsTool = Descendants(editor).OfType<Button>().Single(b => b.Name == "ToolFormsButton");
+            formsTool.Command!.Execute(formsTool.CommandParameter);
+            if (workspace.Shell.Section != ProPDF.Presentation.PdfShellSection.Forms) throw new InvalidOperationException("Native task catalog is not wired.");
+            var pagesToggle = Descendants(editor).OfType<Button>().Single(b => b.Name == "PagesPaneButton");
+            pagesToggle.Command!.Execute(pagesToggle.CommandParameter);
+            if (!workspace.Shell.PagesVisible) throw new InvalidOperationException("Native page rail is not wired.");
+            pagesToggle.Command.Execute(pagesToggle.CommandParameter);
+            var searchToggle = Descendants(editor).OfType<Button>().Single(b => b.Name == "FindPaneButton");
+            searchToggle.Command!.Execute(searchToggle.CommandParameter);
+            if (!workspace.Shell.IsSearchOpen) throw new InvalidOperationException("Native search button is not wired.");
+            searchToggle.Command.Execute(searchToggle.CommandParameter);
+            allTools.Command.Execute(allTools.CommandParameter);
+            Pump(Task.CompletedTask);
+            if (runtime.Session.Current!.Id != chromeRevision) throw new InvalidOperationException("Shell navigation edited the PDF.");
             workspace.SearchQuery = "workspace";
             Pump(workspace.SearchCommand.ExecuteAsync());
             if (runtime.Viewport.SearchHits.Count == 0) throw new InvalidOperationException("WPF search command failed.");
@@ -191,6 +217,27 @@ internal static class Program
                     }
                 if (colored < 200) throw new InvalidOperationException("WPF screenshot is missing its expected PDF content.");
             }
+            // Exercise the actual native resize path. Drawers must overlay at compact sizes.
+            window.Width = 720;
+            closeTools.Command.Execute(closeTools.CommandParameter);
+            Pump(Task.CompletedTask);
+            window.UpdateLayout();
+            if (!workspace.Shell.IsCompact) throw new InvalidOperationException("Native width did not reach responsive shell state.");
+            var compactWidth = editor.View.ActualWidth;
+            pagesToggle.Command.Execute(pagesToggle.CommandParameter);
+            Pump(Task.CompletedTask);
+            window.UpdateLayout();
+            if (!workspace.Shell.PagesVisible || Math.Abs(editor.View.ActualWidth - compactWidth) > 1)
+                throw new InvalidOperationException("Compact page drawer squeezed the document.");
+            pagesToggle.Command.Execute(pagesToggle.CommandParameter);
+            Pump(Task.CompletedTask);
+            runtime.Viewport.FitPage(); Pump(runtime.Viewport.WaitForRenderingAsync());
+            window.UpdateLayout();
+            var compactBitmap = new RenderTargetBitmap((int)editor.ActualWidth, (int)editor.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            compactBitmap.Render(editor);
+            var compactEncoder = new PngBitmapEncoder(); compactEncoder.Frames.Add(BitmapFrame.Create(compactBitmap));
+            using (var output = File.Create(Path.Combine(Path.GetDirectoryName(path)!, "wpf-compact.png"))) compactEncoder.Save(output);
+            if (runtime.Session.Current!.Id != chromeRevision) throw new InvalidOperationException("Native resizing changed the PDF revision.");
             window.Content = null;
             window.Close();
             Pump(runtime.DisposeAsync().AsTask());

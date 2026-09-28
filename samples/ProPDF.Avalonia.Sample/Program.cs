@@ -27,7 +27,7 @@ public sealed class SampleApplication : Application
         {
             var runtime = new DemoWorkspace(action => Dispatcher.UIThread.Post(action));
             var editor = new PdfEditor { Context = runtime.Context };
-            var window = new Window { Title = "ProPDF — PDF editor", Width = 1450, Height = 960, MinWidth = 900, MinHeight = 640, Content = editor };
+            var window = new Window { Title = "ProPDF — PDF editor", Width = 1450, Height = 960, MinWidth = 640, MinHeight = 480, Content = editor };
             var closing = false;
             var approved = false;
             window.Opened += async (_, _) =>
