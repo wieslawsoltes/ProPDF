@@ -43,6 +43,8 @@ internal sealed class PdfEditorChrome
     private const uint Ink = 0x292929, Muted = 0x686868, Line = 0xDEDEDE, Blue = 0x1465DC;
     private readonly Grid _body = new(), _center = new();
     private readonly Border _left = new(), _right = new();
+    private readonly Border _palette;
+    private readonly StackPanel _quickStack;
     private readonly FrameworkElement _inspector, _catalog, _file, _organize, _redact, _toolSettings;
     private readonly StackPanel _sectionTabs = Stack(true), _history = Stack(true);
     private readonly Border _searchBar;
@@ -101,9 +103,11 @@ internal sealed class PdfEditorChrome
         _body.ColumnDefinitions.Add(new() { Width = new GridLength(300) }); _body.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         _body.ColumnDefinitions.Add(new() { Width = new GridLength(0) }); _body.ColumnDefinitions.Add(new() { Width = new GridLength(48) });
         Add(Root, _body, 3);
+        _center.RowDefinitions.Add(new() { Height = new GridLength(0) });
         _center.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) }); _center.RowDefinitions.Add(new() { Height = new GridLength(44) });
-        Add(_center, view); Add(_body, _center, 0, 1);
-        var quick = Stack(); quick.Margin = new Thickness(4);
+        Identify(view, "PdfViewport", "PDF document viewport");
+        Add(_center, view, 1); Add(_body, _center, 0, 1);
+        var quick = _quickStack = Stack(); quick.Margin = new Thickness(4);
         foreach (var (tool, label, icon) in new[] { ("Pan", "Hand / pan", PdfShellIcons.Pan), ("SelectText", "Select text", PdfShellIcons.Select),
             ("Highlight", "Highlight text", PdfShellIcons.Highlight), ("Note", "Add a sticky note", PdfShellIcons.Comment),
             ("Ink", "Draw freehand", PdfShellIcons.Ink), ("Text", "Add text", PdfShellIcons.Text) })
@@ -111,9 +115,9 @@ internal sealed class PdfEditorChrome
             var button = ActionButton(label, "ActivateToolCommand", icon, false, "Quick" + tool + "Button"); button.CommandParameter = tool;
             button.Width = 36; button.Height = 36; _quick.Add(tool, button); quick.Children.Add(button);
         }
-        var palette = Edge(quick, new Thickness(1)); palette.CornerRadius = new CornerRadius(8); palette.Margin = new Thickness(12, 14, 0, 0);
+        var palette = _palette = Edge(quick, new Thickness(1)); palette.CornerRadius = new CornerRadius(8); palette.Margin = new Thickness(12, 14, 0, 0);
         palette.HorizontalAlignment = HorizontalAlignment.Left; palette.VerticalAlignment = VerticalAlignment.Top;
-        Identify(palette, "QuickToolsPalette", "Quick annotation tools"); Add(_center, palette);
+        Identify(palette, "QuickToolsPalette", "Quick annotation tools"); Add(_center, palette, 1);
         var nav = Stack(true); nav.HorizontalAlignment = HorizontalAlignment.Center;
         nav.Children.Add(ActionButton("Previous page", "PreviousPageCommand", PdfShellIcons.ChevronLeft, false));
         var pageInput = Input("PageInput", "Page number; press Enter to navigate"); pageInput.Width = 40; nav.Children.Add(pageInput);
@@ -122,7 +126,7 @@ internal sealed class PdfEditorChrome
         nav.Children.Add(ActionButton("Zoom out", "ZoomOutCommand", PdfShellIcons.Minus, false));
         var zoom = Text("", 12); zoom.Width = 46; zoom.TextAlignment = TextAlignment.Center; Bind(zoom, TextBlock.TextProperty, "ZoomLabel"); nav.Children.Add(zoom);
         nav.Children.Add(ActionButton("Zoom in", "ZoomInCommand", PdfShellIcons.Plus, false));
-        Identify(nav, "PageNavigation", "Page navigation and zoom"); Add(_center, Edge(Scroll(nav, true), new Thickness(0, 1, 0, 0)), 1);
+        Identify(nav, "PageNavigation", "Page navigation and zoom"); Add(_center, Edge(Scroll(nav, true), new Thickness(0, 1, 0, 0)), 2);
 
         // The rail is always reachable; drawers overlay rather than crushing the PDF on small windows.
         var rail = Stack(); rail.Margin = new Thickness(4, 10, 4, 8);
@@ -204,6 +208,15 @@ internal sealed class PdfEditorChrome
     {
         var s = _workspace?.Shell;
         var compact = s?.IsCompact ?? false; var showTools = s?.ToolsVisible ?? true; var showPages = s?.PagesVisible ?? false;
+        // At phone widths a vertical floating palette would obscure PDF content.
+        // Keep the same controls in a dedicated horizontal row instead.
+        var small = s?.IsSmall ?? false;
+        _center.RowDefinitions[0].Height = new GridLength(small ? 56 : 0);
+        _quickStack.Orientation = small ? Orientation.Horizontal : Orientation.Vertical;
+        Grid.SetRow(_palette, small ? 0 : 1);
+        _palette.Margin = small ? new Thickness(8, 3, 8, 3) : new Thickness(12, 14, 0, 0);
+        _palette.HorizontalAlignment = small ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+        _palette.VerticalAlignment = small ? VerticalAlignment.Center : VerticalAlignment.Top;
         Show(_left, showTools); Show(_right, showPages); Show(_searchBar, s?.IsSearchOpen ?? false);
         Show(_sectionTabs, !compact); Show(_history, !(s?.IsSmall ?? false)); Show(_brandHint, !compact);
         _body.ColumnDefinitions[0].Width = new GridLength(!compact && showTools ? 300 : 0);

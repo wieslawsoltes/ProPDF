@@ -10,7 +10,7 @@ The top bar keeps Open, Save, Undo, Redo and Find accessible. **Menu** opens fil
 
 The floating palette selects the hand, text selection, highlight, sticky-note, ink and text tools. Tasks with text or drawing operations retain the full tool selector and draft text input. Detailed text, object, alignment, appearance and image controls remain in the Edit inspector. PDF edits use the same transactions, undo history, confirmations, capability checks and file services as before.
 
-The right rail opens page thumbnails, bookmarks, comments and document properties. On a wide window the tools and thumbnail panels may both be open. Below 980 logical pixels they overlay the document, with only the most recently opened drawer in front. A closed panel stays closed on resize. On narrow displays Undo and Redo move into Menu; no command requires a wide window.
+The right rail opens page thumbnails, bookmarks, comments and document properties. On a wide window the tools and thumbnail panels may both be open. Below 980 logical pixels they overlay the document, with only the most recently opened drawer in front. A closed panel stays closed on resize. Below 600 logical pixels the quick-tools palette becomes a horizontal row above the document, so it cannot obscure page content. Undo and Redo move into Menu; no command requires a wide window.
 
 ## Keyboard and focus
 

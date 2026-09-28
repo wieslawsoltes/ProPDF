@@ -59,7 +59,16 @@ export async function verifyWorkspaceChrome(page, out, state, pointer) {
       'The document interior must occupy the viewer apart from its scrollbar.');
     if (width < 980) assert.ok(Math.abs(opened.viewWidth - closed.viewWidth) <= 1,
       'Compact drawers must overlay rather than shrink the viewer.');
-    layouts.push({width,opened,closed});
+    const finalControls = await page.evaluate(() => JSON.parse(propdfTest.Controls()));
+    const palette = finalControls.find(c => c.name === 'QuickToolsPalette' && c.visible);
+    const viewport = finalControls.find(c => c.name === 'PdfViewport' && c.visible);
+    assert.ok(palette && viewport, 'Both real controls must be presented.');
+    if (width < 600) {
+      assert.ok(palette.width > palette.height, 'Phone quick tools must form a horizontal row.');
+      assert.ok(palette.y + palette.height <= viewport.y + 1,
+        'Phone quick tools must not cover the document surface.');
+    }
+    layouts.push({width,opened,closed,palette,viewport});
   }
   await page.setViewportSize({width:1450,height:960});
   await pointer('AllToolsButton'); await pointer('FitPageButton');
