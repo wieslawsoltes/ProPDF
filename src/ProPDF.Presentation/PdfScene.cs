@@ -26,6 +26,8 @@ public sealed class PdfScene : IDisposable
     public PdfSize Viewport { get; }
     public int TileCount => _tiles.Length;
     public int PageCount => _pages.Length;
+    /// <summary>Number of raster pixels retained by this scene (excluding native allocation overhead).</summary>
+    public long RasterPixelCount => _tiles.Sum(tile => (long)tile.Tile.Image.Width * tile.Tile.Image.Height);
 
     /// <summary>Creates an independent lifetime for deferred composition. Call before disposing this scene.</summary>
     public PdfScene Retain()
@@ -58,7 +60,14 @@ public sealed class PdfScene : IDisposable
             }
             paint.Style = SKPaintStyle.Fill;
             foreach (var tile in _tiles)
-                canvas.DrawImage(tile.Tile.Image, Rect(tile.Bounds), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+            {
+                // The last tile can end on a fractional device pixel. Its integer allocation
+                // must not be squeezed into a smaller logical rectangle (which distorts text).
+                var request = tile.Tile.Request;
+                var source = new SKRect(0, 0, (float)Math.Min(tile.Tile.Image.Width, request.Clip.Width * request.PixelsPerPoint),
+                    (float)Math.Min(tile.Tile.Image.Height, request.Clip.Height * request.PixelsPerPoint));
+                canvas.DrawImage(tile.Tile.Image, source, Rect(tile.Bounds), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+            }
             foreach (var overlay in _overlays)
             {
                 paint.Color = overlay.Kind switch

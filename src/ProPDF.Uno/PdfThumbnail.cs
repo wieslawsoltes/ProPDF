@@ -8,13 +8,17 @@ public sealed class PdfThumbnail : UserControl
     private readonly SceneSurface _surface = new();
     private CancellationTokenSource? _request;
     private int _generation;
+    private XamlRoot? _root;
+    private double _density = 1;
     public PdfViewportController? Controller { get => (PdfViewportController?)GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public int PageNumber { get => (int)GetValue(PageNumberProperty); set => SetValue(PageNumberProperty, value); }
+    /// <summary>Pixels in the currently retained thumbnail, excluding allocation overhead.</summary>
+    public long RasterPixelCount => _surface.RasterPixelCount;
     public PdfThumbnail()
     {
         Width = 144; Height = 184; Content = _surface;
-        Loaded += (_, _) => { Subscribe(); Reload(); };
-        Unloaded += (_, _) => { Unsubscribe(); Cancel(); _surface.SetScene(null); };
+        Loaded += (_, _) => { _root = XamlRoot; if (_root is not null) _root.Changed += RootChanged; Subscribe(); Reload(); };
+        Unloaded += (_, _) => { if (_root is not null) _root.Changed -= RootChanged; _root = null; Unsubscribe(); Cancel(); _surface.SetScene(null); };
     }
     private static void Changed(DependencyObject sender, DependencyPropertyChangedEventArgs e)
     {
@@ -27,6 +31,8 @@ public sealed class PdfThumbnail : UserControl
     private void DocumentChanged(object? sender, PdfSessionChangedEventArgs e)
     { if (e.Kind != PdfChangeKind.Saved) DispatcherQueue.TryEnqueue(Reload); }
     private void Cancel() { _generation++; try { _request?.Cancel(); } catch (ObjectDisposedException) { } _request = null; }
+    private void RootChanged(XamlRoot sender, XamlRootChangedEventArgs e)
+    { if (sender.RasterizationScale != _density) Reload(); }
     private async void Reload()
     {
         Cancel(); _surface.SetScene(null);
@@ -34,7 +40,8 @@ public sealed class PdfThumbnail : UserControl
         var generation = _generation; using var request = new CancellationTokenSource(); _request = request;
         try
         {
-            var scene = await c.CreateThumbnailAsync(PageNumber, 144, 184, request.Token);
+            _density = _root?.RasterizationScale ?? 1;
+            var scene = await c.CreateThumbnailAsync(PageNumber, 144, 184, _density, request.Token);
             if (!IsLoaded || generation != _generation) scene.Dispose(); else _surface.SetScene(scene);
         }
         catch (OperationCanceledException) { }

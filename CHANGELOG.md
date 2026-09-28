@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.7 — Unreleased
+
+Browser density-only transitions synchronize the Uno canvas and managed viewport through an owned event-driven host observer. Regressions require stable compositor geometry as well as high-resolution tiles and thumbnails.
+
+Instance-scoped host font catalogs preserve real fallback styles; the Uno sample registers its existing Open Sans assets before opening PDFs, without new dependencies or font binaries. Density-aware viewers/thumbnails across Avalonia, WPF and Uno; fractional page-edge source extents no longer squeeze rounded pixel padding. Paint caches use complete structural identities instead of hash-only keys. Synthetic font/style/isolation, display-density/cancellation, paint-collision and actual browser punctuation/bold/Retina regression checks. Font substitution remains distinct from original-font recovery; see `docs/text-rendering.md` and `docs/performance.md`.
+
 ## 0.1.0-alpha.6 — Unreleased
 
 Fit non-embedded substitute glyph advances to explicit PDF widths without changing text positioning or saved bytes. Reuse bounded, reference-counted, design-space glyph outlines across font sizes and zoom levels; preserve fill/stroke/text-clip behavior and resolved default-family styles. Add shared standard-font and line-spacing controls for native text insertion and whole-object replacement in Avalonia, WPF and Uno. Independent fallback-width pixel fixtures, Unicode/cache-lifetime regressions, atomic typography validation and native/browser control round trips. No font files or new dependencies; source-pinned Apache-2.0 interpreter modifications remain attributed and hash-inventoried. See `docs/text-rendering.md`.

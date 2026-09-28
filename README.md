@@ -12,7 +12,7 @@ Owned .NET PDF kernel and editing libraries · SkiaSharp rendering · Avalonia �
 
 ---
 
-**Development preview — 0.1.0-alpha.6.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
+**Development preview — 0.1.0-alpha.7.** ProPDF implements native PDF editing and viewing with independently reusable libraries. It is not complete Adobe Acrobat parity, a conformance-certified PDF implementation or a certified redaction/signature-trust product. The feature matrix distinguishes implemented APIs, editor workflows and remaining qualification.
 
 ## Reusable libraries
 
@@ -56,6 +56,10 @@ The Uno integration is merged. The browser sample and documentation are deployed
 **Native Uno Windows/Linux heads are not included in this sample.** Their stock hosts introduce non-permissive SDK metadata or video dependencies. The browser app is the Uno path on those operating systems; the native WPF/Avalonia editors remain available. Android/iOS and native WinAppSDK are not qualified here. See [Uno boundaries](docs/uno-platform.md).
 
 Samples generate a real three-page PDF. No confidential PDFs, private keys or commercial license files are bundled. Browser imports and downloads remain local to the tab; there is no PDF upload or server-side editing.
+
+## Rendering fidelity
+
+Explicit host font catalogs are shared by all adapters. The browser sample registers its already-shipped Open Sans styles for sans-family substitution instead of relying on an unsuitable last-resort native font. Viewports and tiled thumbnails follow physical display density, including density-only changes, and fractional page-edge padding is not squeezed into page geometry. Full-value paint keys prevent hash-collision color/dash errors. See [text fidelity](docs/text-rendering.md) and [rendering performance](docs/performance.md) for tests, resource bounds and remaining qualification. No new dependencies or font binaries are added.
 
 ## Editor workflows
 

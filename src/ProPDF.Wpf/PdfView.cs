@@ -44,6 +44,8 @@ public sealed class PdfView : FrameworkElement
         if (finalSize.Width > 0 && finalSize.Height > 0) Controller?.SetViewport(finalSize.Width, finalSize.Height, VisualTreeHelper.GetDpi(this).DpiScaleX);
         return finalSize;
     }
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    { base.OnDpiChanged(oldDpi, newDpi); UpdateViewport(); InvalidateVisual(); }
     private void UpdateViewport()
     {
         if (ActualWidth > 0 && ActualHeight > 0) Controller?.SetViewport(ActualWidth, ActualHeight, VisualTreeHelper.GetDpi(this).DpiScaleX);

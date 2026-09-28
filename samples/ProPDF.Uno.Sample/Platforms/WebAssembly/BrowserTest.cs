@@ -31,6 +31,7 @@ public static partial class BrowserTest
         writer.WriteString("revision", w.Document?.Id.ToString()); writer.WriteNumber("pages", c.PageCount);
         writer.WriteString("viewportRevision", c.Document?.Id.ToString()); writer.WriteBoolean("rendering", c.IsRendering);
         writer.WriteNumber("viewportWidth", c.Viewport.Width); writer.WriteNumber("viewportHeight", c.Viewport.Height);
+        writer.WriteNumber("density", c.PixelsPerDip); writer.WriteNumber("rasterPixels", scene.RasterPixelCount);
         writer.WriteNumber("viewWidth", _editor?.View.ActualWidth ?? 0); writer.WriteNumber("viewHeight", _editor?.View.ActualHeight ?? 0);
         writer.WriteNumber("pageWidth", w.Document?.GetPage(c.CurrentPage).Size.Width ?? 0);
         writer.WriteNumber("pageItems", ((ListView)Find("PagesList")).Items.Count);
@@ -42,6 +43,16 @@ public static partial class BrowserTest
         writer.WriteString("title", w.Document?.Metadata.Title); writer.WriteNumber("fields", w.Fields.Count);
         writer.WriteNumber("annotations", w.Annotations.Count); writer.WriteString("tool", c.Tool.ToString());
         writer.WriteEndObject();
+    });
+    [JSExport]
+    public static string FontDiagnostics() => Json(writer =>
+    {
+        writer.WriteStartObject(); writer.WriteString("nativeDefault", SkiaSharp.SKTypeface.Default.FamilyName);
+        writer.WriteNumber("nativeDefaultWeight", SkiaSharp.SKTypeface.Default.FontWeight);
+        writer.WriteNumber("suppliedFaces", _runtime?.Backend.Fonts?.Count ?? 0);
+        writer.WriteString("regular", _runtime?.Backend.Fonts?.FindFace("Helvetica")?.Family);
+        writer.WriteString("bold", _runtime?.Backend.Fonts?.FindFace("Helvetica-Bold", true)?.Family);
+        writer.WriteNumber("fontBytes", _runtime?.Backend.Fonts?.ByteLength ?? 0); writer.WriteEndObject();
     });
     [JSExport]
     public static string Controls() => Json(writer =>
@@ -65,6 +76,7 @@ public static partial class BrowserTest
         {
             var p = thumbnail.TransformToVisual(_editor).TransformPoint(new Windows.Foundation.Point(0, 0));
             writer.WriteStartObject(); writer.WriteNumber("page", thumbnail.PageNumber);
+            writer.WriteNumber("pixels", thumbnail.RasterPixelCount);
             writer.WriteNumber("x", p.X); writer.WriteNumber("y", p.Y);
             writer.WriteNumber("width", thumbnail.ActualWidth); writer.WriteNumber("height", thumbnail.ActualHeight);
             writer.WriteEndObject();

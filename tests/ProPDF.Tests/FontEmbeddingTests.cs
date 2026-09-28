@@ -66,22 +66,23 @@ public sealed class FontEmbeddingTests
 
     internal static class TinyTrueType
     {
-        public static byte[] Create(ushort embeddingFlags = 0, bool format4 = false)
+        public static byte[] Create(ushort embeddingFlags = 0, bool format4 = false, int glyphRight = 500, int glyphTop = 700)
         {
+            if (glyphRight is < 51 or > 600 || glyphTop is < 1 or > 800) throw new ArgumentOutOfRangeException(nameof(glyphRight));
             var tables = new SortedDictionary<string, byte[]>(StringComparer.Ordinal);
             var head = new byte[54]; U32(head, 0, 0x10000); U32(head, 4, 0x10000); U32(head, 12, 0x5f0f3cf5);
-            U16(head, 16, 3); U16(head, 18, 1000); U16(head, 40, 500); U16(head, 42, 700); U16(head, 46, 8);
+            U16(head, 16, 3); U16(head, 18, 1000); U16(head, 40, glyphRight); U16(head, 42, glyphTop); U16(head, 46, 8);
             U16(head, 48, 2); U16(head, 50, 1); tables["head"] = head;
             var hhea = new byte[36]; U32(hhea, 0, 0x10000); U16(hhea, 4, 800); U16(hhea, 6, unchecked((ushort)-200));
-            U16(hhea, 10, 600); U16(hhea, 16, 500); U16(hhea, 18, 1); U16(hhea, 34, 3); tables["hhea"] = hhea;
+            U16(hhea, 10, 600); U16(hhea, 16, glyphRight); U16(hhea, 18, 1); U16(hhea, 34, 3); tables["hhea"] = hhea;
             var maxp = new byte[32]; U32(maxp, 0, 0x10000); U16(maxp, 4, 3); U16(maxp, 6, 4); U16(maxp, 8, 1); U16(maxp, 14, 1); tables["maxp"] = maxp;
             var hmtx = new byte[12]; for (var i = 0; i < 3; i++) { U16(hmtx, i * 4, 600); U16(hmtx, i * 4 + 2, 50); }
             tables["hmtx"] = hmtx;
-            var glyph = new byte[36]; U16(glyph, 0, 1); U16(glyph, 2, 50); U16(glyph, 6, 500); U16(glyph, 8, 700);
+            var glyph = new byte[36]; U16(glyph, 0, 1); U16(glyph, 2, 50); U16(glyph, 6, glyphRight); U16(glyph, 8, glyphTop);
             U16(glyph, 10, 3); // Four on-curve points, no instructions, explicit signed deltas.
             glyph[14] = glyph[15] = glyph[16] = glyph[17] = 1;
-            U16(glyph, 18, 50); U16(glyph, 20, 450); U16(glyph, 22, 0); U16(glyph, 24, unchecked((ushort)-450));
-            U16(glyph, 26, 0); U16(glyph, 28, 0); U16(glyph, 30, 700); U16(glyph, 32, 0);
+            U16(glyph, 18, 50); U16(glyph, 20, glyphRight-50); U16(glyph, 22, 0); U16(glyph, 24, unchecked((ushort)-(glyphRight-50)));
+            U16(glyph, 26, 0); U16(glyph, 28, 0); U16(glyph, 30, glyphTop); U16(glyph, 32, 0);
             tables["glyf"] = glyph.Concat(glyph).Concat(glyph).ToArray();
             var loca = new byte[16]; for (var i = 0; i < 4; i++) U32(loca, i * 4, (uint)(i * glyph.Length)); tables["loca"] = loca;
             var cmap = new byte[format4 ? 52 : 64]; U16(cmap, 2, 1); U16(cmap, 4, 3); U16(cmap, 6, format4 ? 1 : 10); U32(cmap, 8, 12);

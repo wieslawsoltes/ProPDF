@@ -39,3 +39,24 @@ behavior.
 ## Substitute glyph reuse
 
 The optional renderer caches substitute outlines in font-design coordinates, independently of font size, page zoom and tile scale. Each resolved typeface retains at most 256 Unicode/direction mappings and approximately 512 KiB of outlines. Oversized entries remain transient. A held outline lease remains valid after eviction or cache disposal. The glyph cache does not account for the entire font manager, shaper, parser or native allocation footprint; active leases can temporarily exceed its retained-cache budget. See [Text rendering and typography](text-rendering.md) for width fitting and qualification limits.
+
+
+## Display density and fractional tile edges
+
+The viewer separates logical DIPs from physical raster pixels. A display-density-only change invalidates the tile plan without changing document revision, logical zoom, scrolling or cached PDF display lists. Avalonia listens for top-level scaling changes, WPF handles DPI changes, and Uno listens for XamlRoot changes in addition to size changes. Native per-monitor hardware/driver behavior still needs physical-device testing.
+
+The new `CreateThumbnailAsync(page, width, height, pixelsPerDip, token)` overload draws density-aware previews while preserving DIP dimensions. The original overload retains its 1x behavior. High-density previews use bounded 512-pixel tiles rather than an unlimited full-page allocation. Maximum preview dimensions remain 512 DIPs, density is 0.5–8, and failed/cancelled generation releases all acquired tiles. Adapter thumbnails reload when density changes. At 2x density the same logical preview has approximately four times as many raster pixels, not a stretched 1x image. This costs corresponding raster/cache memory; it is not free supersampling.
+
+Page-edge tiles can have fractional pixel extents but require integer image allocation. Composition now uses the exact source extent instead of squeezing the rounded padding pixel into the logical page. The regression checks a known stripe's position rather than relying on a nonempty image. Linear sampling and the existing gutters remain; this is not a guarantee for every transparency group, unbounded filter or GPU compositor.
+
+## Exact paint-cache identity
+
+The attributed Skia interpreter previously used a 32-bit hash as the entire paint key. Distinct colors or dash sequences with the same hash could reuse the wrong native paint. Keys now compare the full color, alpha, stroke parameters, dash values and blend override. Dash arrays are snapshotted only on misses, so mutating caller-owned input cannot change a stored key. Repeated equal values reuse the existing native paint. Tests deliberately construct color/dash hash collisions and check output colors; this is a correctness repair, not a new ICC/color-management implementation.
+
+## Browser canvas density synchronization
+
+Uno 6.7.135 sizes its browser canvas on `window.resize`, while managed display information can detect a density-only change without that event. The sample's owned `display-density.mjs` observes a resolution media query and rearms it after each actual density change. It coalesces one ordinary resize notification on the next animation frame, allowing Uno's existing host path to resize both the native surface and the managed viewport. It does not poll, patch private runtime methods, change CSS dimensions, reset zoom, or reload the PDF. Ordinary resize events at unchanged density add no notification. The observer disposes on normal page exit and rechecks restored back/forward-cache pages.
+
+Browser tests change only device density, then require unchanged document/zoom/layout, scaled page/thumbnail pixel counts and the same independently observed PDF panel geometry. Captures use CDP directly because Playwright's screenshot helper can restore the original emulation settings. The bounded pixel gate checks header placement, logical bounds and area instead of accepting any nonempty frame. Desktop physical monitor transitions, Safari/Firefox and GPU-driver behavior still require separate qualification.
+
+Upstream host behavior: [Uno 6.7.135 BrowserRenderer](https://github.com/unoplatform/uno/blob/6.7.135/src/Uno.UI.Runtime.Skia.WebAssembly.Browser/ts/Runtime/BrowserRenderer.ts).

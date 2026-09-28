@@ -15,9 +15,12 @@ public sealed class PdfThumbnail : Control
     private CancellationTokenSource? _request;
     private PdfScene? _scene;
     private bool _attached;
+    private TopLevel? _root;
     private long _generation;
     public PdfViewportController? Controller { get => GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public int PageNumber { get => GetValue(PageNumberProperty); set => SetValue(PageNumberProperty, value); }
+    /// <summary>Pixels in the currently retained thumbnail, excluding allocation overhead.</summary>
+    public long RasterPixelCount => _scene?.RasterPixelCount ?? 0;
     public PdfThumbnail() { Width = 152; Height = 192; ClipToBounds = true; }
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -33,12 +36,16 @@ public sealed class PdfThumbnail : Control
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
+        _root = TopLevel.GetTopLevel(this);
+        if (_root is not null) _root.ScalingChanged += ScalingChanged;
         if (Controller is { } controller) controller.Session.Changed += DocumentChanged;
         Reload();
     }
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _attached = false;
+        if (_root is not null) _root.ScalingChanged -= ScalingChanged;
+        _root = null;
         if (Controller is { } controller) controller.Session.Changed -= DocumentChanged;
         Reload();
         base.OnDetachedFromVisualTree(e);
@@ -47,6 +54,7 @@ public sealed class PdfThumbnail : Control
     {
         if (e.Kind != PdfChangeKind.Saved) Dispatcher.UIThread.Post(Reload);
     }
+    private void ScalingChanged(object? sender, EventArgs e) => Reload();
     private async void Reload()
     {
         var generation = ++_generation;
@@ -59,7 +67,7 @@ public sealed class PdfThumbnail : Control
         _request = request;
         try
         {
-            var scene = await controller.CreateThumbnailAsync(PageNumber, 152, 192, request.Token);
+            var scene = await controller.CreateThumbnailAsync(PageNumber, 152, 192, _root?.RenderScaling ?? 1, request.Token);
             if (!_attached || generation != _generation) scene.Dispose();
             else { _scene = scene; InvalidateVisual(); }
         }

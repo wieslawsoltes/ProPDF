@@ -27,6 +27,27 @@ internal static partial class PlatformHost
     private static partial Task MarkReadyAsync();
     [JSImport("failure", "ProPDFBrowser")]
     private static partial void ReportFailure(string error);
+    public static async Task<ProPDF.Engine.PdfPig.PdfFontCatalog?> LoadFontsAsync()
+    {
+        // These OFL fonts already ship with Uno.Fonts.OpenSans for the UI. Skia's native
+        // font manager cannot discover the browser's CSS/Uno font registry automatically.
+        // Map sans-serif families explicitly. Do not substitute a proportional face for
+        // Courier/monospace, Symbol, or arbitrary unknown fonts behind the caller's back.
+        var styles = new[] { ("Regular", false, false), ("Bold", true, false), ("Italic", false, true), ("BoldItalic", true, true) };
+        var faces = await Task.WhenAll(styles.Select(async style =>
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromApplicationUriAsync(
+                new Uri($"ms-appx:///Uno.Fonts.OpenSans/Fonts/OpenSans-{style.Item1}.ttf"));
+            await using var input = await file.OpenStreamForReadAsync();
+            var bytes = await PdfStreams.ReadBoundedAsync(input, 4 * 1024 * 1024);
+            return new ProPDF.Engine.PdfPig.PdfFontFace("Open Sans", bytes, style.Item2, style.Item3);
+        }));
+        return new ProPDF.Engine.PdfPig.PdfFontCatalog(faces, aliases: new Dictionary<string, string>
+        {
+            ["Helvetica"] = "Open Sans", ["Arial"] = "Open Sans", ["HelveticaNeue"] = "Open Sans",
+            ["Helvetica Neue"] = "Open Sans", ["sans-serif"] = "Open Sans"
+        });
+    }
     public static IPdfUnoFiles CreateFiles() => new BrowserFiles();
     public static async Task ReadyAsync(PdfEditor editor, DemoWorkspace runtime)
     { BrowserTest.Initialize(editor, runtime); await MarkReadyAsync(); }

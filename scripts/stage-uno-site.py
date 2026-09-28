@@ -40,7 +40,8 @@ def main():
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(root, target)
-    shutil.copy2('samples/ProPDF.Uno.Sample/browser-host.js', target / 'browser-host.js')
+    for module in ('browser-host.js', 'display-density.mjs'):
+        shutil.copy2(pathlib.Path('samples/ProPDF.Uno.Sample') / module, target / module)
     shutil.copytree('artifacts/site', target / 'docs')
     shutil.copytree(notices, target / 'licenses/packages', dirs_exist_ok=True)
     shutil.copytree('artifacts/upstream-notices', target / 'licenses/Uno', dirs_exist_ok=True)

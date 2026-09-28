@@ -17,6 +17,7 @@ public sealed class PdfView : Control
     public static readonly StyledProperty<PdfViewportController?> ControllerProperty =
         AvaloniaProperty.Register<PdfView, PdfViewportController?>(nameof(Controller));
     private bool _attached;
+    private TopLevel? _root;
     public PdfViewportController? Controller { get => GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
 
     public PdfView()
@@ -39,12 +40,16 @@ public sealed class PdfView : Control
     {
         base.OnAttachedToVisualTree(e);
         _attached = true;
+        _root = TopLevel.GetTopLevel(this);
+        if (_root is not null) _root.ScalingChanged += ScalingChanged;
         if (Controller is { } controller) controller.Invalidated += ControllerInvalidated;
         UpdateViewport(Bounds.Size);
     }
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _attached = false;
+        if (_root is not null) _root.ScalingChanged -= ScalingChanged;
+        _root = null;
         if (Controller is { } controller) { controller.Invalidated -= ControllerInvalidated; controller.CancelInteraction(); }
         base.OnDetachedFromVisualTree(e);
     }
@@ -59,6 +64,7 @@ public sealed class PdfView : Control
         UpdateViewport(finalSize);
         return finalSize;
     }
+    private void ScalingChanged(object? sender, EventArgs e) { UpdateViewport(Bounds.Size); InvalidateVisual(); }
     private void UpdateViewport(Size size)
     {
         if (size.Width > 0 && size.Height > 0) Controller?.SetViewport(size.Width, size.Height, TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);

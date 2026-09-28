@@ -35,6 +35,7 @@
     <PackageReference Include="Uno.WinUI.Graphics2DSK" Version="6.7.135" />
     <PackageReference Include="Uno.Fonts.OpenSans" Version="2.9.4" />
     <Content Include="browser-host.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="display-density.mjs" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../artifacts/upstream-notices/*.txt" Link="licenses/Uno/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.Contains('browserwasm'))">

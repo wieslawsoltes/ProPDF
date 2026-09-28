@@ -12,7 +12,7 @@
     {
       "path": "Helpers/SKPaintCache.cs",
       "upstream_sha256": "f26a6439aa44a129dd91a410d78b4a2d08456be7624da0d07e457c336fb99f23",
-      "vendored_sha256": "f1d87427fe4f7829b85eab8119cb5afbe1781483974fe5158170b04ad4546cea"
+      "vendored_sha256": "4161e3f390af46a8e417f43560d630f7cb7f975e842baf81d82192e5eb3abccc"
     },
     {
       "path": "Helpers/SkiaExtensions.cs",
@@ -22,7 +22,7 @@
     {
       "path": "Helpers/SkiaFontCache.Font.cs",
       "upstream_sha256": "2f700b9df94f71ef4449e5d1e0210579ef320a4d8e9ceaabd07f62d8cb866de3",
-      "vendored_sha256": "e2e6852999b99254aaa4ff52a5228cfdb38390cd9e00dfbb6d490ec9475f9960"
+      "vendored_sha256": "e5cf63e45cc87aa2c4e2bd155ea6e59b2dfc5bd5da68638430abbcd7cae87070"
     },
     {
       "path": "Helpers/SkiaFontCache.Glyph.cs",
@@ -72,7 +72,7 @@
     {
       "path": "SkiaPageFactory.cs",
       "upstream_sha256": "4b7283de54c2b8e92d7badf1138df26b86880228a02feba801224da55a937f9e",
-      "vendored_sha256": "31cdc0d4d89836f3032980d0c3943546bf37ea5b795607d64dc90e847cd801c1"
+      "vendored_sha256": "584c3af377ba523bf82be9f66a8aadda468be792299d9b52b61724141cd8f74d"
     },
     {
       "path": "SkiaRenderingFilterProvider.cs",
