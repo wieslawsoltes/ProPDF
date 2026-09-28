@@ -53,9 +53,49 @@ export async function inspectStandardFontImage(page, bytes) {
 export async function verifyDensityTransition(browser, base, out) {
   const context = await browser.newContext({ viewport:{width:1200,height:900}, deviceScaleFactor:2 });
   const page=await context.newPage();const errors=[], missing=[];
+  const cdp=await context.newCDPSession(page);
   page.on('pageerror', e=>errors.push(e.message));
   page.on('response', r=>{if(r.status()>=400 && /\.(wasm|js|dll|ttf|woff2?)(\?|$)/i.test(r.url())) missing.push(r.url());});
   try {
+    // Use one CDP session for emulation and capture. Playwright's screenshot helper
+    // temporarily reapplies the context's original deviceScaleFactor (2 here),
+    // undoing a later density-only override and invalidating this experiment.
+    await cdp.send('Emulation.setDeviceMetricsOverride',{width:1200,height:900,deviceScaleFactor:2,mobile:false});
+    async function capture(density, path) {
+      const started=Date.now();let attempts=0;
+      do {
+        assert.equal(await page.evaluate(()=>devicePixelRatio),density,'Capture must not reset display density.');
+        let timer;
+        const {data}=await Promise.race([
+          cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false}),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Density screenshot timed out.')),5000);})
+        ]).finally(()=>clearTimeout(timer));
+        const bytes=Buffer.from(data,'base64');
+        const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);
+        assert.equal(width,1200*density);assert.equal(height,900*density);
+        assert.equal(await page.evaluate(()=>devicePixelRatio),density,'Screenshot changed the emulated density.');
+        const navyPixels=await page.evaluate(async ({data,density})=>{
+          const image=new Image();image.src='data:image/png;base64,'+data;await image.decode();
+          const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+          const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+          const pixels=ctx.getImageData(0,0,image.width,image.height).data;let count=0;
+          // Inspect the actual PDF panel, not the app header or thumbnail backgrounds.
+          for(let y=Math.ceil(180*density);y<image.height-50*density;y++)
+            for(let x=Math.ceil(200*density);x<image.width-325*density;x++) {
+              const i=(y*image.width+x)*4;
+              if(Math.abs(pixels[i]-24)<4 && Math.abs(pixels[i+1]-43)<4 && Math.abs(pixels[i+2]-79)<4)count++;
+            }
+          return count;
+        },{data,density});
+        attempts++;
+        if(navyPixels>=10000*density*density) {
+          await writeFile(path,bytes);
+          return {width,height,navyPixels,attempts};
+        }
+        await page.waitForTimeout(100);
+      } while(Date.now()-started<15000);
+      assert.fail('The PDF was not composited at the requested display density.');
+    }
     await page.goto(base+'?test=1',{waitUntil:'domcontentloaded'});
     await page.waitForFunction(()=>globalThis.propdfTest || document.documentElement.dataset.propdfError,null,{timeout:240000});
     assert.equal(await page.evaluate(()=>document.documentElement.dataset.propdfError),undefined);
@@ -68,11 +108,9 @@ export async function verifyDensityTransition(browser, base, out) {
     }
     const retina=await settled(2);assert.equal(retina.state.error,null);
     await page.locator('.uno-loader').waitFor({state:'hidden',timeout:15000});
-    const shot=await page.screenshot({path:`${out}/uno-density-2.png`,timeout:15000});
-    assert.equal(shot.readUInt32BE(16),2400); assert.equal(shot.readUInt32BE(20),1800);
+    const retinaFrame=await capture(2,`${out}/uno-density-2.png`);
     // Change ONLY display density, preserving CSS viewport. This catches adapters
     // that update only on a size event and keep blurry cached images on monitor moves.
-    const cdp=await context.newCDPSession(page);
     await cdp.send('Emulation.setDeviceMetricsOverride',{width:1200,height:900,deviceScaleFactor:1.25,mobile:false});
     const fractional=await settled(1.25);assert.equal(fractional.state.error,null);
     assert.equal(retina.state.revision,fractional.state.revision);assert.equal(retina.state.zoom,fractional.state.zoom);
@@ -80,12 +118,14 @@ export async function verifyDensityTransition(browser, base, out) {
     assert.ok(retina.state.rasterPixels>fractional.state.rasterPixels*1.7);
     const a=retina.thumbnails.find(t=>t.page===1), b=fractional.thumbnails.find(t=>t.page===1);
     assert.ok(a.pixels>b.pixels*2.4 && a.pixels<b.pixels*2.7,'Thumbnail pixels must follow display density squared.');
-    const final=await page.screenshot({path:`${out}/uno-density-1_25.png`,timeout:15000});
-    assert.equal(final.readUInt32BE(16),1500);assert.equal(final.readUInt32BE(20),1125);
+    const fractionalFrame=await capture(1.25,`${out}/uno-density-1_25.png`);
+    assert.equal((await settled(1.25)).state.revision,retina.state.revision);
     assert.deepEqual(errors,[]);assert.deepEqual(missing,[]);
-    await writeFile(`${out}/density.json`,JSON.stringify({retina,fractional,errors,missing},null,2));
+    await writeFile(`${out}/density.json`,JSON.stringify({retina,fractional,retinaFrame,fractionalFrame,errors,missing},null,2));
   } catch(error) {
-    await page.screenshot({path:`${out}/density-failure.png`,timeout:5000}).catch(()=>{});
+    // Keep failure diagnostics at the failing density as well.
+    await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false})
+      .then(({data})=>writeFile(`${out}/density-failure.png`,Buffer.from(data,'base64'))).catch(()=>{});
     await writeFile(`${out}/density-failure.json`,JSON.stringify({error:String(error),errors,missing,state:await page.evaluate(()=>globalThis.propdfTest?JSON.parse(propdfTest.State()):null).catch(()=>null)},null,2));
     throw error;
   } finally { await context.close(); }
