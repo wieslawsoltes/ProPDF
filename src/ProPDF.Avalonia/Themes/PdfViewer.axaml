@@ -106,11 +106,11 @@
                 <ComboBox Name="SidebarSelect" Margin="0,0,0,10" HorizontalAlignment="Stretch" ItemsSource="{Binding SidebarSections}" SelectedIndex="{Binding SidebarIndex, Mode=TwoWay}" AutomationProperties.Name="Viewer panel" />
                 <Grid Grid.Row="1">
                   <ListBox Name="PagesList" Background="Transparent" ItemsSource="{Binding Workspace.Pages}" SelectedItem="{Binding Workspace.SelectedPage, Mode=TwoWay}" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=0}" AutomationProperties.Name="Page thumbnails">
-                    <ListBox.ItemTemplate><DataTemplate><p:PdfViewerThumbnail PageNumber="{Binding Number}" Controller="{Binding $parent[p:PdfViewerSidebar].Owner.Context.Viewport}" /></DataTemplate></ListBox.ItemTemplate>
+                    <ListBox.ItemTemplate><DataTemplate><p:PdfViewerThumbnail PageNumber="{Binding Number}" Controller="{Binding Owner.Context.Viewport, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type p:PdfViewerSidebar}}}" /></DataTemplate></ListBox.ItemTemplate>
                   </ListBox>
                   <Grid RowDefinitions="*,Auto,160,Auto" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=1}">
                     <ListBox Name="BookmarksList" Background="Transparent" ItemsSource="{Binding Workspace.NavigationBookmarks}" SelectedItem="{Binding Workspace.SelectedBookmark, Mode=TwoWay}" AutomationProperties.Name="Document outline">
-                      <ListBox.ItemTemplate><DataTemplate><Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding $parent[p:PdfViewerSidebar].Owner.ActivateBookmarkCommand}" CommandParameter="{Binding}" Content="{Binding Title}" /></DataTemplate></ListBox.ItemTemplate>
+                      <ListBox.ItemTemplate><DataTemplate><Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding Owner.ActivateBookmarkCommand, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type p:PdfViewerSidebar}}}" CommandParameter="{Binding}" Content="{Binding Title}" /></DataTemplate></ListBox.ItemTemplate>
                     </ListBox>
                     <TextBlock Grid.Row="1" Text="PAGE LINKS" Classes="pdfCaption" Margin="0,12,0,8" />
                     <ListBox Name="LinksList" Grid.Row="2" ItemsSource="{Binding Workspace.NavigationLinks}" SelectedItem="{Binding Workspace.SelectedLink, Mode=TwoWay}" AutomationProperties.Name="Document links">
