@@ -34,6 +34,7 @@ markdown_extensions:
       permalink: true
 nav:
   - Overview: index.md
+  - Avalonia PDF viewer: avalonia-viewer.md
   - Uno Platform: uno-platform.md
   - Document workspace: workspace-ui.md
   - Getting started: getting-started.md
