@@ -15,13 +15,11 @@ public class PdfViewerToolbar : TemplatedControl
     public static readonly StyledProperty<PdfViewer?> OwnerProperty = AvaloniaProperty.Register<PdfViewerToolbar, PdfViewer?>(nameof(Owner));
     public PdfViewer? Owner { get => GetValue(OwnerProperty); set => SetValue(OwnerProperty, value); }
 }
-
 public class PdfViewerSidebar : TemplatedControl
 {
     public static readonly StyledProperty<PdfViewer?> OwnerProperty = AvaloniaProperty.Register<PdfViewerSidebar, PdfViewer?>(nameof(Owner));
     public PdfViewer? Owner { get => GetValue(OwnerProperty); set => SetValue(OwnerProperty, value); }
 }
-
 /// <summary>Templated wrapper around the existing asynchronous, density-aware thumbnail renderer.</summary>
 public class PdfViewerThumbnail : TemplatedControl
 {
@@ -30,21 +28,18 @@ public class PdfViewerThumbnail : TemplatedControl
     public PdfViewportController? Controller { get => GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public int PageNumber { get => GetValue(PageNumberProperty); set => SetValue(PageNumberProperty, value); }
 }
-
 public sealed class PdfViewerPageTappedEventArgs(int pageNumber, PdfPoint point) : EventArgs
 {
     public int PageNumber { get; } = pageNumber;
     public PdfPoint Point { get; } = point;
 }
-
-/// <summary>Templated viewport; the three named parts are optional. The host owns Controller.</summary>
+/// <summary>Templated viewport; all three named parts are optional. The host owns Controller.</summary>
 public class PdfViewerViewport : TemplatedControl
 {
     public static readonly StyledProperty<PdfViewportController?> ControllerProperty = AvaloniaProperty.Register<PdfViewerViewport, PdfViewportController?>(nameof(Controller));
     public static readonly StyledProperty<bool> IsReadOnlyProperty = AvaloniaProperty.Register<PdfViewerViewport, bool>(nameof(IsReadOnly), true);
     private PdfView? _surface;
-    private ScrollBar? _vertical;
-    private ScrollBar? _horizontal;
+    private ScrollBar? _vertical, _horizontal;
     private PdfViewportController? _subscribed;
     private bool _attached, _syncing;
     private int _queued;
@@ -52,36 +47,37 @@ public class PdfViewerViewport : TemplatedControl
     public PdfViewportController? Controller { get => GetValue(ControllerProperty); set => SetValue(ControllerProperty, value); }
     public bool IsReadOnly { get => GetValue(IsReadOnlyProperty); set => SetValue(IsReadOnlyProperty, value); }
     public event EventHandler<PdfViewerPageTappedEventArgs>? PageTapped;
-
     public PdfViewerViewport()
     {
-        AddHandler(PointerPressedEvent, PointerPressed, RoutingStrategies.Tunnel, true);
-        AddHandler(PointerReleasedEvent, PointerReleased, RoutingStrategies.Bubble, true);
+        AddHandler(PointerPressedEvent, OnSurfacePointerPressed, RoutingStrategies.Tunnel, true);
+        AddHandler(PointerReleasedEvent, OnSurfacePointerReleased, RoutingStrategies.Bubble, true);
         AddHandler(KeyDownEvent, GuardKeys, RoutingStrategies.Tunnel);
     }
     private void GuardKeys(object? sender, KeyEventArgs e)
     {
         if (IsReadOnly && (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0 && e.Key is Key.Z or Key.Y) e.Handled = true;
     }
-    private void PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnSurfacePointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_surface is null) return;
-        if (IsReadOnly && Controller is { } c && c.Tool is not (PdfTool.Pan or PdfTool.SelectText or PdfTool.SelectRegion)) c.Tool = PdfTool.Pan;
-        _press = e.GetPosition(_surface);
-    }
-    private void PointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        var start = _press;
         _press = null;
+        if (_surface is null) return;
+        var position = e.GetPosition(_surface);
+        if (!new Rect(_surface.Bounds.Size).Contains(position) || !e.GetCurrentPoint(_surface).Properties.IsLeftButtonPressed) return;
+        if (IsReadOnly && Controller is { } c && c.Tool is not (PdfTool.Pan or PdfTool.SelectText or PdfTool.SelectRegion)) c.Tool = PdfTool.Pan;
+        _press = position;
+    }
+    private void OnSurfacePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var start = _press; _press = null;
         if (_surface is null || start is null || Controller is not { } c || c.Tool is not (PdfTool.Pan or PdfTool.SelectText)) return;
         var end = e.GetPosition(_surface);
-        if ((end - start.Value).Length > 4) return;
+        var dx = end.X - start.Value.X; var dy = end.Y - start.Value.Y;
+        if (dx * dx + dy * dy > 16 || !new Rect(_surface.Bounds.Size).Contains(end)) return;
         if (c.HitTest(new PdfPoint(end.X, end.Y)) is { } hit) PageTapped?.Invoke(this, new PdfViewerPageTappedEventArgs(hit.PageNumber, hit.Point));
     }
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
-        DetachParts();
-        base.OnApplyTemplate(e);
+        DetachParts(); base.OnApplyTemplate(e);
         _surface = e.NameScope.Find<PdfView>("PART_Surface");
         _vertical = e.NameScope.Find<ScrollBar>("PART_VerticalScrollBar");
         _horizontal = e.NameScope.Find<ScrollBar>("PART_HorizontalScrollBar");
@@ -95,10 +91,7 @@ public class PdfViewerViewport : TemplatedControl
         if (change.Property == ControllerProperty) { Subscribe(); Synchronize(); }
         if (change.Property == IsReadOnlyProperty && IsReadOnly) Controller?.CancelInteraction();
     }
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e); _attached = true; Subscribe(); Synchronize();
-    }
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) { base.OnAttachedToVisualTree(e); _attached = true; Subscribe(); Synchronize(); }
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _attached = false; Subscribe(); Controller?.CancelInteraction(); _press = null;
