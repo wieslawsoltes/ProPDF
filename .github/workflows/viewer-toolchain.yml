@@ -1,0 +1,51 @@
+name: Viewer isolated toolchain
+on:
+  push:
+    branches: [feat/templated-avalonia-viewer]
+    paths: ['.github/workflows/viewer-toolchain.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore bounded viewer dependencies
+        run: |
+          dotnet workload install wasm-tools
+          dotnet restore tests/ProPDF.Avalonia.Smoke -p:ProPDFBuildBrowser=false
+          dotnet restore tests/ProPDF.Tests -p:ProPDFBuildBrowser=false
+          mkdir -p /tmp/viewer-dependencies
+          cat > /tmp/viewer-dependencies/dependencies.csproj <<'XML'
+          <Project Sdk="Microsoft.NET.Sdk.WebAssembly"><PropertyGroup><TargetFramework>net10.0-browser</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="Avalonia.Browser" Version="12.1.3"/><PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3"/><PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" Version="3.119.4"/><PackageReference Include="HarfBuzzSharp.NativeAssets.WebAssembly" Version="8.3.1.3"/></ItemGroup></Project>
+          XML
+          dotnet restore /tmp/viewer-dependencies/dependencies.csproj
+      - name: Archive SDK and public package cache only
+        run: |
+          mkdir -p artifacts/sdk artifacts/packs artifacts/packages
+          tar -czf artifacts/sdk/sdk.tar.gz --exclude='./packs' -C "$DOTNET_ROOT" .
+          tar -czf artifacts/packs/packs.tar.gz -C "$DOTNET_ROOT" packs
+          tar -czf artifacts/packages/packages.tar.gz -C "$HOME/.nuget" packages
+          sha256sum artifacts/*/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viewer-sdk
+          path: artifacts/sdk
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viewer-packs
+          path: artifacts/packs
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viewer-packages
+          path: artifacts/packages
+          retention-days: 1
+          compression-level: 0
