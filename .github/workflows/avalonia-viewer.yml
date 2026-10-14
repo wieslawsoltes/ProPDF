@@ -1,0 +1,50 @@
+name: Avalonia viewer
+on:
+  push:
+    branches: [feat/templated-avalonia-viewer]
+  pull_request:
+    paths:
+      - 'src/ProPDF.Avalonia/**'
+      - 'samples/ProPDF.Avalonia.Viewer*/**'
+      - 'tests/ProPDF.Avalonia.Viewer*/**'
+      - 'scripts/avalonia-viewer*'
+      - '.github/workflows/avalonia-viewer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: avalonia-viewer-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Capture exact source
+        run: |
+          mkdir -p artifacts/viewer-source
+          git archive --format=zip HEAD -o artifacts/viewer-source/source.zip
+          git rev-parse HEAD > artifacts/viewer-source/commit.txt
+          git rev-parse HEAD^{tree} > artifacts/viewer-source/tree.txt
+          sha256sum artifacts/viewer-source/source.zip > artifacts/viewer-source/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avalonia-viewer-source
+          path: artifacts/viewer-source/
+          retention-days: 14
+      - uses: actions/setup-dotnet@v4
+        if: hashFiles('samples/ProPDF.Avalonia.Viewer.Browser/*.csproj') != ''
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and test viewer
+        if: hashFiles('scripts/avalonia-viewer-validate.sh') != ''
+        run: bash scripts/avalonia-viewer-validate.sh
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('artifacts/avalonia-viewer/**') != ''
+        with:
+          name: avalonia-viewer-validation
+          path: artifacts/avalonia-viewer/
+          retention-days: 14
