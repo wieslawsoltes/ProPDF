@@ -23,6 +23,7 @@ internal static class Program
     {
         var output = args.Length > 0 ? args[0] : "artifacts/avalonia-viewer/native";
         Directory.CreateDirectory(output);
+        ViewerShell? shell = null;
         try
         {
             AppBuilder.Configure<SmokeApplication>().UseSkia().WithInterFont()
@@ -33,7 +34,7 @@ internal static class Program
             Check(!empty.NextPageCommand.CanExecute(null) && !empty.PrintCommand.CanExecute(null), "Detached viewer commands are disabled");
             foreach (var type in new[] { typeof(PdfViewer), typeof(PdfViewerToolbar), typeof(PdfViewerSidebar), typeof(PdfViewerViewport), typeof(PdfViewerThumbnail) })
                 Check(typeof(TemplatedControl).IsAssignableFrom(type), type.Name + " is a TemplatedControl");
-            var shell = new ViewerShell();
+            shell = new ViewerShell();
             var hostContext = new object();
             shell.Viewer.DataContext = hostContext;
             var window = new Window { Width = 1440, Height = 980, Content = shell };
@@ -113,6 +114,15 @@ internal static class Program
             Check(viewer.PageNumber == 2, "Commands survive retemplating");
             shell.SetMinimalTemplate(false); Pump(Task.CompletedTask);
             Check(viewer.GetVisualDescendants().OfType<Button>().Any(b => b.Name == "NextPageButton"), "Default template restores without reconstructing the viewer");
+            Check(viewer.PageNumber == 2 && runtime.Viewport.CurrentPage == 2, "Restoring the default template preserves the selected page");
+            runtime.Viewport.ScrollBy(0, 140); Pump(Task.CompletedTask);
+            double ReadingTop() => -runtime.Viewport.GetPageViewportBounds(2)!.Value.Y / (runtime.Viewport.Zoom * 96 / 72);
+            var readingTop = ReadingTop();
+            viewer.IsSidebarVisible = false; Pump(Task.CompletedTask);
+            Check(viewer.PageNumber == 2 && Math.Abs(ReadingTop() - readingTop) < .05, "Hiding the sidebar preserves the PDF-space reading anchor");
+            viewer.IsSidebarVisible = true; Pump(Task.CompletedTask);
+            Check(viewer.PageNumber == 2 && Math.Abs(ReadingTop() - readingTop) < .05, "Restoring the sidebar preserves the PDF-space reading anchor");
+            runtime.Viewport.GoToPage(2); Pump(Task.CompletedTask);
             var pageEvents = 0;
             viewer.PageChanged += (_, _) => pageEvents++;
             window.Content = null; Pump(Task.CompletedTask);
@@ -120,6 +130,7 @@ internal static class Program
             Check(runtime.Session.Current!.Id == revision, "Detach does not dispose or replace the host document");
             window.Content = shell; Pump(Task.CompletedTask);
             Until(() => viewer.Workspace is not null && viewer.PageNumber == 2);
+            Check(runtime.Viewport.CurrentPage == 2, "Reattach preserves the host controller page");
             pageEvents = 0;
             Pump(viewer.NextPageCommand.ExecuteAsync()); Until(() => viewer.PageNumber == 3);
             Check(pageEvents == 1, "Reattach does not duplicate page-change subscriptions");
@@ -143,6 +154,11 @@ internal static class Program
         catch (Exception error)
         {
             File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new { passed = false, checks = Checks, error = error.ToString() }, new JsonSerializerOptions { WriteIndented = true }));
+            if (shell is not null)
+            {
+                try { var state = shell.Snapshot(); File.WriteAllText(Path.Combine(output, "failure-state.json"), state); Console.Error.WriteLine("VIEWER_FAILURE_STATE " + state); }
+                catch (Exception diagnosticError) { Console.Error.WriteLine("Diagnostic capture failed: " + diagnosticError.Message); }
+            }
             Console.Error.WriteLine(error); return 1;
         }
     }
