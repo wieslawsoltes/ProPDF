@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 async def run(args):
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
-    checks, console, errors = [], [], []
+    checks, console, errors, clicks = [], [], [], []
     started = time.monotonic()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True, args=['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
@@ -38,33 +38,62 @@ async def run(args):
         def passed(name, details=None):
             checks.append({'name': name, 'passed': True, 'details': details})
             print('PASS ' + name, flush=True)
+        async def frame():
+            await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        def geometry(control):
+            return tuple(round(control[key], 2) for key in ('x', 'y', 'width', 'height')) + (control['enabled'],)
+        async def stable_control(name, enabled):
+            # Visibility can change before Avalonia has arranged the newly visible
+            # search/panel row. Observe multiple rendered frames, including hover;
+            # never retry an actual click or fall back to invoking a command.
+            deadline = time.monotonic() + 15
+            previous, since, last = None, time.monotonic(), None
+            while time.monotonic() < deadline:
+                await frame()
+                s = await state()
+                last = s.get('controls', {}).get(name)
+                if not last or not last.get('visible') or (enabled and not last['enabled']):
+                    previous, since = None, time.monotonic()
+                    continue
+                current = geometry(last)
+                if current != previous:
+                    previous, since = current, time.monotonic()
+                    continue
+                if time.monotonic() - since < .08:
+                    continue
+                x, y = last['x'] + last['width'] / 2, last['y'] + last['height'] / 2
+                size = page.viewport_size
+                if not (0 <= x < size['width'] and 0 <= y < size['height']):
+                    raise AssertionError(f'Control is outside viewport: {name}: {last}')
+                await page.mouse.move(x, y)
+                await frame()
+                hovered = (await state()).get('controls', {}).get(name)
+                if hovered and geometry(hovered) == current:
+                    return hovered, x, y
+                previous, since = None, time.monotonic()
+            raise AssertionError(f'No stable actionable bounds for {name}: {last}')
         async def click(name, enabled=True):
-            s = await until(lambda s: name in s.get('controls', {}), 'visible control ' + name)
-            control = s['controls'][name]
-            if enabled and not control['enabled']:
-                raise AssertionError('Control is unexpectedly disabled: ' + name)
-            x, y = control['x'] + control['width'] / 2, control['y'] + control['height'] / 2
-            size = page.viewport_size
-            if x < 0 or y < 0 or x >= size['width'] or y >= size['height']:
-                raise AssertionError(f'Control is outside viewport: {name}: {control}')
+            control, x, y = await stable_control(name, enabled)
+            clicks.append({'name': name, 'bounds': control, 'x': x, 'y': y})
             await page.mouse.click(x, y)
-            await asyncio.sleep(.12)
+            await frame()
         async def text(name, value, enter=False):
             await click(name)
+            await until(lambda s: s.get('focusedControl') == name, 'keyboard focus for ' + name)
             await page.keyboard.press('Control+A')
             await page.keyboard.press('Backspace')
             if value:
                 await page.keyboard.type(value, delay=12)
             if enter:
                 await page.keyboard.press('Enter')
-            await asyncio.sleep(.12)
+            await frame()
         async def select(name, index):
             await click(name)
             await page.keyboard.press('Home')
             for _ in range(index):
                 await page.keyboard.press('ArrowDown')
             await page.keyboard.press('Enter')
-            await asyncio.sleep(.2)
+            await frame()
         async def settle():
             return await until(lambda s: s.get('ready') and not s.get('busy') and not s.get('rendering') and not s.get('searching'), 'settled viewer')
         async def download(name, destination):
@@ -126,6 +155,7 @@ async def run(args):
                 await settle()
                 passed(mode + ' layout and fit width')
             await page.keyboard.press('Control+f')
+            await until(lambda s: s.get('searchBarVisible'), 'keyboard find visible')
             await text('PART_SearchBox', 'PDF', True)
             await until(lambda s: not s.get('searching') and s.get('search') == 'PDF' and s.get('hits', 0) >= 3, 'PDF search')
             passed('Keyboard find opens a live document-wide search')
@@ -225,7 +255,8 @@ async def run(args):
             passed('Malformed PDF input preserves the previously open document')
             await click('DismissErrorButton')
             await select('SidebarSelect', 0)
-            await click('FirstPageButton') if (await state())['page'] != 1 else asyncio.sleep(0)
+            if (await state())['page'] != 1:
+                await click('FirstPageButton')
             await click('FitPageButton')
             await click('DarkThemeCheck')
             await until(lambda s: s.get('theme') == 'Dark', 'dark theme')
@@ -267,6 +298,7 @@ async def run(args):
             (output / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False))
             (output / 'console.json').write_text(json.dumps(console, indent=2, ensure_ascii=False))
             (output / 'page-errors.json').write_text(json.dumps(errors, indent=2))
+            (output / 'clicks.json').write_text(json.dumps(clicks, indent=2))
             await context.close()
             await browser.close()
 
