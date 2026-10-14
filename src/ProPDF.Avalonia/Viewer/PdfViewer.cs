@@ -255,14 +255,16 @@ public partial class PdfViewer
         if (ZoomMode == PdfViewerZoomMode.FitPage) zoom = Math.Min(zoom, (c.Viewport.Height - 48) / (height * 96 / 72));
         _fitZoom = Math.Clamp(zoom, .05, 16);
         // Automatic width fitting follows the top of the reading position, not the
-        // viewport center. Center anchoring can reveal the previous page when a
-        // sidebar or replacement template narrows the surface and reduces zoom.
+        // viewport center. Use the exact page edge: adding even one DIP can reveal
+        // a sliver of the previous page when a narrower template reduces zoom.
         PdfPoint? anchor = null;
         if (c.GetPageViewportBounds(current + 1) is { Width: > 2, Height: > 2 } bounds)
             anchor = new PdfPoint(Math.Clamp(c.Viewport.Width / 2, bounds.X + 1, bounds.Right - 1),
-                Math.Clamp(Math.Max(0, bounds.Y) + 1, bounds.Y + 1, bounds.Bottom - 1));
+                Math.Clamp(Math.Max(0, bounds.Y), bounds.Y, bounds.Bottom - 1));
         c.SetZoom(_fitZoom, anchor);
-        if (ZoomMode == PdfViewerZoomMode.FitPage) c.GoToPage(current + 1);
+        // Fitting is not navigation. Retain the selected page even when extent
+        // clamping or floating-point page-edge rounding changes the first visible row.
+        if (ZoomMode == PdfViewerZoomMode.FitPage || c.CurrentPage != current + 1) c.GoToPage(current + 1);
     }
     private async void PageTapped(object? sender, PdfViewerPageTappedEventArgs e)
     {
