@@ -201,7 +201,12 @@ async def run(args):
             assert s['revision'] == revision
             passed('Pointer selection extracts real PDF text without editing the document')
             await page.keyboard.press('Control+c')
-            clipboard = await page.evaluate('navigator.clipboard.readText()')
+            deadline = time.monotonic() + 5
+            while True:
+                clipboard = await page.evaluate('navigator.clipboard.readText()')
+                if 'shared engine' in clipboard.lower() or time.monotonic() >= deadline:
+                    break
+                await asyncio.sleep(.05)
             assert 'shared engine' in clipboard.lower(), clipboard
             passed('Selected PDF text reaches the browser clipboard')
             await click('EnableEditingCheck')
