@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Styling;
@@ -19,12 +21,23 @@ public sealed class ViewerShell : UserControl, IAsyncDisposable
 {
     private bool _started, _disposed;
     private readonly Border _banner;
+    private int _findKeyCount;
+    private string? _findKeySource;
     public ViewerShell()
     {
         var catalog = CreateFontCatalog(out var count);
         FontFaceCount = count;
         Runtime = new DemoWorkspace(action => Dispatcher.UIThread.Post(action), catalog);
         Viewer = new PdfViewer { Name = "PdfViewer", Context = Runtime.Context, IsReadOnly = true };
+        // Observe only the Find shortcut, never ordinary text entry or passwords.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Key.F && (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0)
+            {
+                _findKeyCount++;
+                _findKeySource = (e.Source as Control)?.Name ?? e.Source?.GetType().Name;
+            }
+        }, RoutingStrategies.Tunnel, true);
         var enableEditing = new CheckBox { Name = "EnableEditingCheck", Content = "Enable editing", Margin = new Thickness(12, 0) };
         var dark = new CheckBox { Name = "DarkThemeCheck", Content = "Dark theme", Margin = new Thickness(12, 0) };
         var minimal = new CheckBox { Name = "MinimalTemplateCheck", Content = "Minimal template", Margin = new Thickness(12, 0) };
@@ -102,6 +115,7 @@ public sealed class ViewerShell : UserControl, IAsyncDisposable
             var text = c switch { TextBox box when box.Name != "PART_DialogInput" => box.Text, TextBlock block => block.Text, ContentControl content => content.Content as string, _ => null };
             controls[name] = new { x = position.X, y = position.Y, width = c.Bounds.Width, height = c.Bounds.Height, enabled = c.IsEffectivelyEnabled, visible, type = c.GetType().Name, text };
         }
+        var focus = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
         using var scene = Runtime.Viewport.CaptureScene();
         return JsonSerializer.Serialize(new
         {
@@ -110,6 +124,7 @@ public sealed class ViewerShell : UserControl, IAsyncDisposable
             readOnly = Viewer.IsReadOnly, revision = Runtime.Session.Current?.Id, dirty = Runtime.Session.IsDirty,
             error = Viewer.ErrorMessage, busy = Viewer.IsBusy, rendering = Runtime.Viewport.IsRendering,
             searching = Viewer.IsSearching, search = Viewer.SearchText, hits = Viewer.SearchResults.Count, hitIndex = Viewer.SearchResultIndex, selectedText = Runtime.Viewport.SelectedText,
+            searchBarVisible = Viewer.IsSearchBarVisible, focusedControl = focus?.Name, focusedType = focus?.GetType().Name, findKeyCount = _findKeyCount, findKeySource = _findKeySource,
             sidebar = Viewer.IsSidebarVisible, sidebarIndex = Viewer.SidebarIndex, compact = Viewer.IsCompact, dialog = Viewer.IsDialogOpen, dialogTitle = Viewer.DialogTitle,
             title = Viewer.DocumentTitle, sceneTileCount = scene.TileCount, rasterPixels = scene.RasterPixelCount,
             offsetY = Runtime.Viewport.Offset.Y, extentHeight = Runtime.Viewport.Extent.Height, viewportWidth = Runtime.Viewport.Viewport.Width,
