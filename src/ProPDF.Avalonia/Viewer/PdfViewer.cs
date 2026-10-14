@@ -111,7 +111,7 @@ public partial class PdfViewer
         _workspace!.PropertyChanged += WorkspaceChanged;
         _observed = context.Viewport;
         _observed.Invalidated += ViewportInvalidated;
-        _observed.SetLayoutMode(LayoutMode);
+        if (_observed.LayoutMode != LayoutMode) _observed.SetLayoutMode(LayoutMode);
         _observed.Tool = ToolAllowed(Tool) ? Tool : PdfTool.Pan;
         if (ZoomMode == PdfViewerZoomMode.Custom) _observed.SetZoom(Zoom);
         Synchronize(); QueueFit();
@@ -254,7 +254,14 @@ public partial class PdfViewer
         var zoom = (c.Viewport.Width - 48 - gap) / (width * 96 / 72);
         if (ZoomMode == PdfViewerZoomMode.FitPage) zoom = Math.Min(zoom, (c.Viewport.Height - 48) / (height * 96 / 72));
         _fitZoom = Math.Clamp(zoom, .05, 16);
-        c.SetZoom(_fitZoom);
+        // Automatic width fitting follows the top of the reading position, not the
+        // viewport center. Center anchoring can reveal the previous page when a
+        // sidebar or replacement template narrows the surface and reduces zoom.
+        PdfPoint? anchor = null;
+        if (c.GetPageViewportBounds(current + 1) is { Width: > 2, Height: > 2 } bounds)
+            anchor = new PdfPoint(Math.Clamp(c.Viewport.Width / 2, bounds.X + 1, bounds.Right - 1),
+                Math.Clamp(Math.Max(0, bounds.Y) + 1, bounds.Y + 1, bounds.Bottom - 1));
+        c.SetZoom(_fitZoom, anchor);
         if (ZoomMode == PdfViewerZoomMode.FitPage) c.GoToPage(current + 1);
     }
     private async void PageTapped(object? sender, PdfViewerPageTappedEventArgs e)
