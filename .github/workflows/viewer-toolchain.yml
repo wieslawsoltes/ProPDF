@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -27,7 +29,7 @@ jobs:
       - name: Archive SDK and public package cache only
         run: |
           mkdir -p artifacts/sdk artifacts/packs artifacts/packages
-          tar -czf artifacts/sdk/sdk.tar.gz --exclude='./packs' -C "$DOTNET_ROOT" .
+          tar -czf artifacts/sdk/sdk.tar.gz -C "$DOTNET_ROOT" dotnet host sdk/$(dotnet --version) shared/Microsoft.NETCore.App sdk-manifests metadata LICENSE.txt ThirdPartyNotices.txt
           tar -czf artifacts/packs/packs.tar.gz -C "$DOTNET_ROOT" packs
           tar -czf artifacts/packages/packages.tar.gz -C "$HOME/.nuget" packages
           sha256sum artifacts/*/*.tar.gz
