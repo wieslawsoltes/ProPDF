@@ -12,8 +12,11 @@ public static partial class Program
     public static Task Main(string[] args)
     {
         ViewerApplication.CreatePrintService = () => new BrowserPdfPrintHandoff();
+        // Browser options must participate in PreSetupBrowser. Registering a fresh
+        // instance with AppBuilder.With later replaces the initialized asset resolver
+        // and breaks lazy imports such as the native/browser storage provider.
         return AppBuilder.Configure<ViewerApplication>().WithInterFont().LogToTrace()
-            .With(new BrowserPlatformOptions { PreferFileDialogPolyfill = true }).StartBrowserAppAsync("out");
+            .StartBrowserAppAsync("out", new BrowserPlatformOptions { PreferFileDialogPolyfill = true });
     }
     [JSExport]
     public static string Snapshot() => ViewerApplication.Shell?.Snapshot() ?? "{\"ready\":false}";
