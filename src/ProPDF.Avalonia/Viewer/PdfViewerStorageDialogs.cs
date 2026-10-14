@@ -57,7 +57,15 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
         cancellationToken.ThrowIfCancellationRequested();
         suggestedName = Path.GetFileName(suggestedName);
         if (suggestedName.Length > 33 && suggestedName[32] == '_' && Guid.TryParseExact(suggestedName[..32], "N", out _)) suggestedName = suggestedName[33..];
-        var file = await Top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Save a copy", SuggestedFileName = suggestedName, DefaultExtension = Path.GetExtension(suggestedName).TrimStart('.') });
+        IStorageFile? file;
+        try
+        {
+            file = await Top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Save a copy", SuggestedFileName = suggestedName, DefaultExtension = Path.GetExtension(suggestedName).TrimStart('.') });
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new IOException("The host save picker failed: " + error, error);
+        }
         if (file is null) return null;
         try
         {
@@ -69,13 +77,20 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
     public async Task PublishFileAsync(string stagedPath, CancellationToken cancellationToken)
     {
         if (!_destinations.Remove(stagedPath, out var file)) throw new InvalidOperationException("No user-selected output destination exists for this operation.");
-        using (file)
+        try
         {
-            await using var input = new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
-            await using var output = await file.OpenWriteAsync();
-            if (output.CanSeek) output.SetLength(0);
-            await input.CopyToAsync(output, cancellationToken);
-            await output.FlushAsync(cancellationToken);
+            using (file)
+            {
+                await using var input = new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+                await using var output = await file.OpenWriteAsync();
+                if (output.CanSeek) output.SetLength(0);
+                await input.CopyToAsync(output, cancellationToken);
+                await output.FlushAsync(cancellationToken);
+            }
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new IOException("Publishing to the selected destination failed: " + error, error);
         }
     }
     public Task<string?> RequestPasswordAsync(CancellationToken cancellationToken) => owner.PromptAsync("Open protected PDF", "Enter the document password. It is used locally and is not stored by the viewer.", true, cancellationToken);
