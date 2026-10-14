@@ -142,9 +142,19 @@ public sealed class PdfView : Control
                 case Key.Add: case Key.OemPlus: controller.SetZoom(controller.Zoom * 1.15); break;
                 case Key.Subtract: case Key.OemMinus: controller.SetZoom(controller.Zoom / 1.15); break;
                 case Key.D0 when command: controller.FitPage(); break;
-                case Key.Z when command: await controller.Session.UndoAsync(); break;
-                case Key.Y when command: await controller.Session.RedoAsync(); break;
+                case Key.Z when command:
+                    e.Handled = true;
+                    await controller.Session.UndoAsync();
+                    break;
+                case Key.Y when command:
+                    e.Handled = true;
+                    await controller.Session.RedoAsync();
+                    break;
                 case Key.C when command:
+                    // Browser default actions are decided synchronously. Mark the key
+                    // handled before awaiting clipboard I/O, otherwise native Copy can
+                    // race our PDF text write and replace it with an empty DOM selection.
+                    e.Handled = true;
                     if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(controller.SelectedText);
                     break;
                 case Key.Escape: controller.CancelInteraction(); controller.ClearSelection(); break;

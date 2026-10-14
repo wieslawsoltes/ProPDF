@@ -24,8 +24,9 @@ jobs:
     timeout-minutes: 25
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
-      # All native libraries/samples and tests on each host. The separate mandatory
-      # Uno job handles WebAssembly compilation, its complete graph and runtime tests.
+      # Native solution builds do not require WebAssembly. CI additionally restores
+      # the standalone Avalonia browser graph so the full-repository license gate
+      # inspects every project. Dedicated browser jobs compile and exercise WASM.
       ProPDFBuildBrowser: 'false'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -44,8 +45,11 @@ jobs:
           dotnet-version: |
             10.0.x
             8.0.x
-      - name: Restore every native Release project graph
-        run: dotnet restore ProPDF.slnx -p:Configuration=Release
+      - name: Restore every Release dependency graph
+        run: |
+          dotnet restore ProPDF.slnx -p:Configuration=Release
+          dotnet workload install wasm-tools
+          dotnet restore samples/ProPDF.Avalonia.Viewer.Browser -p:Configuration=Release
       - name: Verify source-pinned renderer and legal notices
         run: python scripts/verify-renderer-source.py
       - name: Collect complete license evidence and enforce policy
@@ -61,6 +65,8 @@ jobs:
         run: dotnet test tests/ProPDF.Tests -c Release --no-build --logger trx --results-directory artifacts/tests --collect:"XPlat Code Coverage"
       - name: Avalonia real-Skia headless editor validation
         run: dotnet run --project tests/ProPDF.Avalonia.Smoke -c Release --no-build -- artifacts/headless/avalonia.png
+      - name: Templated Avalonia viewer contracts
+        run: dotnet run --project tests/ProPDF.Avalonia.Viewer.Smoke -c Release --no-build -- artifacts/headless/viewer
       - name: WPF software-rendered editor validation
         if: runner.os == 'Windows'
         run: dotnet run --project tests/ProPDF.Wpf.Smoke -c Release --no-build -- artifacts/headless/wpf.png

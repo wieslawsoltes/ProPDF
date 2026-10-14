@@ -13,12 +13,15 @@
   <Folder Name="/samples/">
     <Project Path="samples/ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
     <Project Path="samples/ProPDF.Avalonia.Sample/ProPDF.Avalonia.Sample.csproj" />
+    <Project Path="samples/ProPDF.Avalonia.Viewer/ProPDF.Avalonia.Viewer.csproj" />
+    <Project Path="samples/ProPDF.Avalonia.Viewer.Desktop/ProPDF.Avalonia.Viewer.Desktop.csproj" />
     <Project Path="samples/ProPDF.Wpf.Sample/ProPDF.Wpf.Sample.csproj" />
     <Project Path="samples/ProPDF.Uno.Sample/ProPDF.Uno.Sample.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ProPDF.Tests/ProPDF.Tests.csproj" />
     <Project Path="tests/ProPDF.Avalonia.Smoke/ProPDF.Avalonia.Smoke.csproj" />
+    <Project Path="tests/ProPDF.Avalonia.Viewer.Smoke/ProPDF.Avalonia.Viewer.Smoke.csproj" />
     <Project Path="tests/ProPDF.Wpf.Smoke/ProPDF.Wpf.Smoke.csproj" />
   </Folder>
 </Solution>

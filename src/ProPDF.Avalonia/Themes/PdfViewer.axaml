@@ -1,0 +1,203 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:p="using:ProPDF.Avalonia" x:CompileBindings="False">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+          <SolidColorBrush x:Key="PdfViewerSurface">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerSubtle">#F5F7FA</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerBorder">#DDE3EC</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerText">#182B4F</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerMuted">#5A6A84</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerAccent">#315CE7</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerError">#FFF0EF</SolidColorBrush>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="PdfViewerSurface">#1B2130</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerSubtle">#242C3C</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerBorder">#39445A</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerText">#E8EEFC</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerMuted">#AAB8D0</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerAccent">#8BABFF</SolidColorBrush>
+          <SolidColorBrush x:Key="PdfViewerError">#512E39</SolidColorBrush>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+      <p:PdfViewerEqualsConverter x:Key="PdfEquals" />
+      <ControlTheme x:Key="{x:Type p:PdfViewerThumbnail}" TargetType="p:PdfViewerThumbnail">
+        <Setter Property="Template">
+          <ControlTemplate>
+            <StackPanel Spacing="6" Margin="8" HorizontalAlignment="Center">
+              <Border Background="White" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="1" BoxShadow="0 2 8 0 #20000000">
+                <p:PdfThumbnail Width="156" Height="204" Controller="{TemplateBinding Controller}" PageNumber="{TemplateBinding PageNumber}" />
+              </Border>
+              <TextBlock Text="{TemplateBinding PageNumber}" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource PdfViewerMuted}" />
+            </StackPanel>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="{x:Type p:PdfViewerViewport}" TargetType="p:PdfViewerViewport">
+        <Setter Property="ClipToBounds" Value="True" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Grid ColumnDefinitions="*,14" RowDefinitions="*,14" Background="{DynamicResource PdfViewerSubtle}">
+              <p:PdfView Name="PART_Surface" ClipToBounds="True" />
+              <ScrollBar Name="PART_VerticalScrollBar" Grid.Column="1" Orientation="Vertical" AllowAutoHide="False" AutomationProperties.Name="Vertical PDF scroll" />
+              <ScrollBar Name="PART_HorizontalScrollBar" Grid.Row="1" Orientation="Horizontal" AllowAutoHide="False" AutomationProperties.Name="Horizontal PDF scroll" />
+            </Grid>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="{x:Type p:PdfViewerToolbar}" TargetType="p:PdfViewerToolbar">
+        <Setter Property="Foreground" Value="{DynamicResource PdfViewerText}" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="{DynamicResource PdfViewerSurface}" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="0,0,0,1" Padding="12,8">
+              <Grid DataContext="{TemplateBinding Owner}" RowDefinitions="Auto,Auto">
+                <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,8">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="PDF WORKSPACE" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PdfViewerMuted}" />
+                    <TextBlock Text="{Binding DocumentTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Name="OpenButton" Classes="pdfTool" Command="{Binding Workspace.OpenCommand}" ToolTip.Tip="Open a PDF · Ctrl+O" AutomationProperties.Name="Open PDF">
+                      <StackPanel Orientation="Horizontal" Spacing="6"><Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource PdfViewerText}" StrokeThickness="1.7" Data="M2,5 L8,5 L10,7 L20,7 L20,18 L2,18 Z M2,9 L22,9 L19,18 L2,18"/><TextBlock Text="Open" /></StackPanel>
+                    </Button>
+                    <Button Name="ProtectedOpenButton" Classes="pdfTool" Content="Password…" Command="{Binding Workspace.OpenProtectedCommand}" ToolTip.Tip="Open a password-protected PDF" />
+                    <Button Name="SaveButton" Classes="pdfTool" Content="Save copy" Command="{Binding Workspace.SaveAsCommand}" ToolTip.Tip="Save PDF to a user-selected destination · Ctrl+S" />
+                    <Button Name="PrintButton" Classes="pdfTool" Content="Print" Command="{Binding PrintCommand}" ToolTip.Tip="Hand the PDF to the host print service · Ctrl+P" />
+                  </StackPanel>
+                </Grid>
+                <WrapPanel Grid.Row="1">
+                  <Button Name="SidebarButton" Classes="pdfTool" Content="Panels" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Show or hide the navigation and inspector panels" />
+                  <Button Name="FindButton" Classes="pdfTool" Content="Find" Command="{Binding ToggleSearchCommand}" ToolTip.Tip="Find text · Ctrl+F" />
+                  <Border Width="1" Height="24" Background="{DynamicResource PdfViewerBorder}" Margin="6,0" />
+                  <Button Name="BackButton" Classes="pdfTool" Content="←" Command="{Binding Workspace.BackCommand}" AutomationProperties.Name="Previous view" />
+                  <Button Name="ForwardButton" Classes="pdfTool" Content="→" Command="{Binding Workspace.ForwardCommand}" AutomationProperties.Name="Next view" />
+                  <Button Name="FirstPageButton" Classes="pdfTool" Content="|‹" Command="{Binding FirstPageCommand}" AutomationProperties.Name="First page" />
+                  <Button Name="PreviousPageButton" Classes="pdfTool" Content="‹" Command="{Binding PreviousPageCommand}" AutomationProperties.Name="Previous page" />
+                  <TextBox Name="PageInput" Classes="pdfInput" Width="54" Text="{Binding PageText, Mode=TwoWay}" IsEnabled="{Binding HasDocument}" AutomationProperties.Name="Page number" />
+                  <TextBlock Text="{Binding PageCount, StringFormat='/ {0}'}" VerticalAlignment="Center" Margin="4,0" />
+                  <Button Name="NextPageButton" Classes="pdfTool" Content="›" Command="{Binding NextPageCommand}" AutomationProperties.Name="Next page" />
+                  <Button Name="LastPageButton" Classes="pdfTool" Content="›|" Command="{Binding LastPageCommand}" AutomationProperties.Name="Last page" />
+                  <Border Width="1" Height="24" Background="{DynamicResource PdfViewerBorder}" Margin="6,0" />
+                  <Button Name="ZoomOutButton" Classes="pdfTool" Content="−" Command="{Binding ZoomOutCommand}" AutomationProperties.Name="Zoom out" />
+                  <TextBox Name="ZoomInput" Classes="pdfInput" Width="72" Text="{Binding ZoomText, Mode=TwoWay}" IsEnabled="{Binding HasDocument}" AutomationProperties.Name="Zoom percentage" />
+                  <Button Name="ZoomInButton" Classes="pdfTool" Content="+" Command="{Binding ZoomInCommand}" AutomationProperties.Name="Zoom in" />
+                  <Button Name="FitWidthButton" Classes="pdfTool" Content="Fit width" Command="{Binding FitWidthCommand}" />
+                  <Button Name="FitPageButton" Classes="pdfTool" Content="Fit page" Command="{Binding FitPageCommand}" />
+                  <ComboBox Name="LayoutSelect" Classes="pdfInput" Width="132" ItemsSource="{Binding LayoutModes}" SelectedItem="{Binding LayoutMode, Mode=TwoWay}" IsEnabled="{Binding HasDocument}" AutomationProperties.Name="Page layout" />
+                  <ToggleButton Name="PanButton" Classes="pdfTool" Content="Hand" Command="{Binding SetToolCommand}" CommandParameter="Pan" IsChecked="{Binding Tool, Converter={StaticResource PdfEquals}, ConverterParameter=Pan, Mode=OneWay}" />
+                  <ToggleButton Name="SelectTextButton" Classes="pdfTool" Content="Text" Command="{Binding SetToolCommand}" CommandParameter="SelectText" IsChecked="{Binding Tool, Converter={StaticResource PdfEquals}, ConverterParameter=SelectText, Mode=OneWay}" />
+                  <ToggleButton Name="HighlightButton" Classes="pdfTool" Content="Highlight" Command="{Binding SetToolCommand}" CommandParameter="Highlight" IsChecked="{Binding Tool, Converter={StaticResource PdfEquals}, ConverterParameter=Highlight, Mode=OneWay}" />
+                  <ToggleButton Name="NoteButton" Classes="pdfTool" Content="Note" Command="{Binding SetToolCommand}" CommandParameter="Note" IsChecked="{Binding Tool, Converter={StaticResource PdfEquals}, ConverterParameter=Note, Mode=OneWay}" />
+                  <Button Name="UndoButton" Classes="pdfTool" Content="Undo" Command="{Binding UndoCommand}" />
+                  <Button Name="RedoButton" Classes="pdfTool" Content="Redo" Command="{Binding RedoCommand}" />
+                </WrapPanel>
+              </Grid>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="{x:Type p:PdfViewerSidebar}" TargetType="p:PdfViewerSidebar">
+        <Setter Property="Foreground" Value="{DynamicResource PdfViewerText}" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="{DynamicResource PdfViewerSurface}" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="0,0,1,0">
+              <Grid DataContext="{TemplateBinding Owner}" RowDefinitions="Auto,*" Margin="10">
+                <ComboBox Name="SidebarSelect" Margin="0,0,0,10" HorizontalAlignment="Stretch" ItemsSource="{Binding SidebarSections}" SelectedIndex="{Binding SidebarIndex, Mode=TwoWay}" AutomationProperties.Name="Viewer panel" />
+                <Grid Grid.Row="1">
+                  <ListBox Name="PagesList" Background="Transparent" ItemsSource="{Binding Workspace.Pages}" SelectedItem="{Binding Workspace.SelectedPage, Mode=TwoWay}" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=0}" AutomationProperties.Name="Page thumbnails">
+                    <ListBox.ItemTemplate><DataTemplate><p:PdfViewerThumbnail PageNumber="{Binding Number}" Controller="{Binding Owner.Context.Viewport, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type p:PdfViewerSidebar}}}" /></DataTemplate></ListBox.ItemTemplate>
+                  </ListBox>
+                  <Grid RowDefinitions="*,Auto,160,Auto" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=1}">
+                    <ListBox Name="BookmarksList" Background="Transparent" ItemsSource="{Binding Workspace.NavigationBookmarks}" SelectedItem="{Binding Workspace.SelectedBookmark, Mode=TwoWay}" AutomationProperties.Name="Document outline">
+                      <ListBox.ItemTemplate><DataTemplate><Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding Owner.ActivateBookmarkCommand, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type p:PdfViewerSidebar}}}" CommandParameter="{Binding}" Content="{Binding Title}" /></DataTemplate></ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Grid.Row="1" Text="PAGE LINKS" Classes="pdfCaption" Margin="0,12,0,8" />
+                    <ListBox Name="LinksList" Grid.Row="2" ItemsSource="{Binding Workspace.NavigationLinks}" SelectedItem="{Binding Workspace.SelectedLink, Mode=TwoWay}" AutomationProperties.Name="Document links">
+                      <ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="3"><TextBlock Text="{Binding PageNumber, StringFormat='Page {0}'}"/><TextBlock Text="{Binding Target.ExternalUri}" TextWrapping="Wrap" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                    </ListBox>
+                    <WrapPanel Grid.Row="3"><Button Classes="pdfTool" Content="Open link" Command="{Binding Workspace.FollowLinkCommand}"/><Button Classes="pdfTool" Content="Copy address" Command="{Binding Workspace.CopyLinkCommand}"/></WrapPanel>
+                  </Grid>
+                  <Grid RowDefinitions="Auto,*" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=2}">
+                    <StackPanel Spacing="6" Margin="0,0,0,10"><TextBlock Text="SEARCH RESULTS" Classes="pdfCaption"/><TextBlock Text="{Binding SearchResultLabel}"/><Button Content="Show search bar" Command="{Binding ToggleSearchCommand}"/></StackPanel>
+                    <ListBox Name="SearchResultsList" Grid.Row="1" ItemsSource="{Binding SearchResults}" SelectedIndex="{Binding SearchResultIndex, Mode=TwoWay}" AutomationProperties.Name="Search results">
+                      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="2,6" Spacing="4"><TextBlock Text="{Binding PageNumber, StringFormat='Page {0}'}" FontWeight="SemiBold"/><TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="12"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                    </ListBox>
+                  </Grid>
+                  <Grid RowDefinitions="*,Auto" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=3}">
+                    <ListBox Name="CommentsList" ItemsSource="{Binding Workspace.Annotations}" SelectedItem="{Binding Workspace.SelectedAnnotation, Mode=TwoWay}"><ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="4" Margin="2,6"><TextBlock Text="{Binding Kind}" FontWeight="SemiBold"/><TextBlock Text="{Binding Contents}" TextWrapping="Wrap"/><TextBlock Text="{Binding PageNumber, StringFormat='Page {0}'}" FontSize="11"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+                    <StackPanel Grid.Row="1" Spacing="8" Margin="0,10,0,0">
+                      <TextBlock Text="COMMENT" Classes="pdfCaption"/>
+                      <TextBox Name="CommentInput" Text="{Binding Workspace.Comment, Mode=TwoWay}" AcceptsReturn="True" MinHeight="64" TextWrapping="Wrap" IsReadOnly="{Binding IsReadOnly}"/>
+                      <WrapPanel IsEnabled="{Binding CanAnnotate}"><Button Classes="pdfTool" Content="Update" Command="{Binding Workspace.UpdateCommentCommand}"/><Button Classes="pdfTool" Content="Delete" Command="{Binding Workspace.DeleteAnnotationCommand}"/></WrapPanel>
+                      <TextBlock Text="NEW ANNOTATION TEXT" Classes="pdfCaption"/>
+                      <TextBox Name="ToolTextInput" Text="{Binding Workspace.ToolText, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/>
+                      <WrapPanel><Button Name="InkButton" Classes="pdfTool" Content="Ink" Command="{Binding SetToolCommand}" CommandParameter="Ink"/><Button Name="FreeTextButton" Classes="pdfTool" Content="Free text" Command="{Binding SetToolCommand}" CommandParameter="FreeText"/></WrapPanel>
+                    </StackPanel>
+                  </Grid>
+                  <Grid RowDefinitions="*,Auto" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=4}">
+                    <ListBox Name="FieldsList" ItemsSource="{Binding Workspace.Fields}" SelectedItem="{Binding Workspace.SelectedField, Mode=TwoWay}" AutomationProperties.Name="Form fields"><ListBox.ItemTemplate><DataTemplate><StackPanel Spacing="4" Margin="2,6"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Value}" TextWrapping="Wrap"/><TextBlock Text="{Binding Kind}" FontSize="11"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+                    <StackPanel Grid.Row="1" Spacing="8" Margin="0,10,0,0"><TextBlock Text="FIELD VALUE" Classes="pdfCaption"/><TextBox Name="FieldValueInput" Text="{Binding Workspace.FieldValue, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/><WrapPanel IsEnabled="{Binding CanEdit}"><Button Name="ApplyFieldButton" Classes="pdfTool" Content="Apply value" Command="{Binding Workspace.SetFieldValueCommand}"/><Button Name="FlattenFormsButton" Classes="pdfTool" Content="Flatten…" Command="{Binding Workspace.FlattenFormsCommand}"/></WrapPanel><TextBlock Text="Signature fields are not edited here. PDF JavaScript and XFA scripts are never executed." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource PdfViewerMuted}"/></StackPanel>
+                  </Grid>
+                  <Grid RowDefinitions="*,Auto" IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=5}">
+                    <ListBox Name="AttachmentsList" ItemsSource="{Binding Workspace.Attachments}" SelectedItem="{Binding Workspace.SelectedAttachment, Mode=TwoWay}"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" TextWrapping="Wrap" Margin="2,8"/></DataTemplate></ListBox.ItemTemplate></ListBox>
+                    <StackPanel Grid.Row="1" Spacing="8"><Button Name="SaveAttachmentButton" Content="Save attachment" Command="{Binding Workspace.SaveAttachmentCommand}"/><WrapPanel IsEnabled="{Binding CanEdit}"><Button Classes="pdfTool" Content="Add…" Command="{Binding Workspace.AddAttachmentCommand}"/><Button Classes="pdfTool" Content="Remove" Command="{Binding Workspace.DeleteAttachmentCommand}"/></WrapPanel><TextBlock Text="Attachments are saved only after an explicit request. They are never executed." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource PdfViewerMuted}"/></StackPanel>
+                  </Grid>
+                  <ScrollViewer IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=6}" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8"><TextBlock Text="DOCUMENT INFORMATION" Classes="pdfCaption"/><TextBlock Text="Title"/><TextBox Text="{Binding Workspace.DocumentTitle, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/><TextBlock Text="Author"/><TextBox Text="{Binding Workspace.DocumentAuthor, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/><TextBlock Text="Subject"/><TextBox Text="{Binding Workspace.DocumentSubject, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/><TextBlock Text="Keywords"/><TextBox Text="{Binding Workspace.DocumentKeywords, Mode=TwoWay}" IsReadOnly="{Binding IsReadOnly}"/><Button Name="SaveMetadataButton" Content="Apply metadata" Command="{Binding Workspace.SaveMetadataCommand}" IsEnabled="{Binding CanEdit}"/><TextBlock Text="{Binding PageCount, StringFormat='Pages: {0}'}"/><TextBlock Text="PDF parsing and text extraction: PdfPig. Rendering: Skia. Files stay local to this host." TextWrapping="Wrap" FontSize="12"/></StackPanel>
+                  </ScrollViewer>
+                  <ScrollViewer IsVisible="{Binding SidebarIndex, Converter={StaticResource PdfEquals}, ConverterParameter=7}" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8"><TextBlock Text="EXPORT" Classes="pdfCaption"/><TextBlock Text="Current page image DPI · 18–1200" TextWrapping="Wrap"/><TextBox Name="ExportDpiInput" Text="{Binding Workspace.ExportDpi, Mode=TwoWay}"/><WrapPanel><Button Name="ExportPngButton" Classes="pdfTool" Content="PNG" Command="{Binding Workspace.ExportPngCommand}"/><Button Name="ExportJpegButton" Classes="pdfTool" Content="JPEG" Command="{Binding Workspace.ExportJpegCommand}"/></WrapPanel><TextBlock Text="Page range · all, odd, even, 1–3, last" TextWrapping="Wrap"/><TextBox Name="PageRangeInput" Text="{Binding Workspace.PageRange, Mode=TwoWay}"/><Button Name="ExportTextButton" Content="Export text" Command="{Binding Workspace.ExportTextCommand}"/><Button Name="ExtractRangeButton" Content="Extract PDF pages" Command="{Binding Workspace.ExtractRangeCommand}"/>
+                      <Separator Margin="0,12"/><TextBlock Text="PAGE ORGANIZATION" Classes="pdfCaption"/><TextBlock Text="These commands edit the PDF and participate in undo history. Rotation is not a view-only setting." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource PdfViewerMuted}"/>
+                      <WrapPanel IsEnabled="{Binding CanEdit}"><Button Name="RotatePageButton" Classes="pdfTool" Content="Rotate" Command="{Binding Workspace.RotateCommand}"/><Button Classes="pdfTool" Content="Duplicate" Command="{Binding Workspace.DuplicatePageCommand}"/><Button Classes="pdfTool" Content="Insert blank" Command="{Binding Workspace.InsertPageCommand}"/><Button Classes="pdfTool" Content="Move up" Command="{Binding Workspace.MoveUpCommand}"/><Button Classes="pdfTool" Content="Move down" Command="{Binding Workspace.MoveDownCommand}"/><Button Classes="pdfTool" Content="Delete…" Command="{Binding Workspace.DeletePageCommand}"/><Button Classes="pdfTool" Content="Merge…" Command="{Binding Workspace.MergeCommand}"/></WrapPanel>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Grid>
+              </Grid>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="{x:Type p:PdfViewer}" TargetType="p:PdfViewer">
+        <Setter Property="Background" Value="{DynamicResource PdfViewerSubtle}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PdfViewerText}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Grid DataContext="{Binding RelativeSource={RelativeSource TemplatedParent}}" Background="{TemplateBinding Background}">
+              <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" IsEnabled="{Binding !IsDialogOpen}">
+                <p:PdfViewerToolbar Owner="{Binding}" IsVisible="{Binding IsToolbarVisible}"/>
+                <Border Grid.Row="1" IsVisible="{Binding IsSearchBarVisible}" Background="{DynamicResource PdfViewerSubtle}" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="0,0,0,1" Padding="12,6">
+                  <WrapPanel><TextBox Name="PART_SearchBox" Classes="pdfInput" Width="220" PlaceholderText="Find in this document" Text="{Binding SearchText, Mode=TwoWay}" AutomationProperties.Name="Search PDF"/><Button Name="SearchButton" Classes="pdfTool" Content="Search" Command="{Binding SearchCommand}"/><CheckBox Name="MatchCaseCheck" Margin="8,0" Content="Case" IsChecked="{Binding MatchCase, Mode=TwoWay}"/><CheckBox Name="WholeWordCheck" Margin="8,0" Content="Whole word" IsChecked="{Binding WholeWord, Mode=TwoWay}"/><CheckBox Name="RegexCheck" Margin="8,0" Content="Regex" IsChecked="{Binding UseRegularExpression, Mode=TwoWay}"/><Button Name="PreviousMatchButton" Classes="pdfTool" Content="Previous" Command="{Binding PreviousMatchCommand}"/><Button Name="NextMatchButton" Classes="pdfTool" Content="Next" Command="{Binding NextMatchCommand}"/><TextBlock Text="{Binding SearchResultLabel}" Margin="8,0" VerticalAlignment="Center"/><Button Name="CancelSearchButton" Classes="pdfTool" Content="Cancel" Command="{Binding CancelSearchCommand}"/><Button Name="CloseSearchButton" Classes="pdfTool" Content="Close" Command="{Binding ToggleSearchCommand}"/></WrapPanel>
+                </Border>
+                <Border Grid.Row="2" Name="ErrorBanner" IsVisible="{Binding HasError}" Background="{DynamicResource PdfViewerError}" Padding="12,8">
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center"/><Button Grid.Column="1" Name="DismissErrorButton" Content="Dismiss" Command="{Binding ClearErrorCommand}" Margin="12,0,0,0"/></Grid>
+                </Border>
+                <Grid Grid.Row="3" ClipToBounds="True">
+                  <p:PdfViewerViewport Name="PART_Viewport" Margin="{Binding ViewportMargin}" Controller="{Binding Context.Viewport}" IsReadOnly="{Binding IsReadOnly}"/>
+                  <p:PdfViewerSidebar Width="{Binding SidebarWidth}" HorizontalAlignment="Left" Owner="{Binding}" IsVisible="{Binding IsSidebarVisible}"/>
+                  <Border Name="EmptyState" IsVisible="{Binding !HasDocument}" Background="{DynamicResource PdfViewerSurface}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="28" CornerRadius="12" Margin="16">
+                    <StackPanel Spacing="12" MaxWidth="300"><TextBlock Text="Your PDF workspace" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Open a PDF to read, search and review it. Processing stays local." TextWrapping="Wrap"/><Button Content="Open PDF" Command="{Binding Workspace.OpenCommand}" HorizontalAlignment="Left"/></StackPanel>
+                  </Border>
+                </Grid>
+                <Border Grid.Row="4" IsVisible="{Binding IsStatusBarVisible}" Background="{DynamicResource PdfViewerSurface}" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="0,1,0,0" Padding="12,6">
+                  <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding StatusText}" FontSize="11" TextTrimming="CharacterEllipsis"/><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"><TextBlock Text="{Binding Tool}" FontSize="11"/><TextBlock Text="Read-only" IsVisible="{Binding IsReadOnly}" FontSize="11"/><ProgressBar Width="48" Height="3" IsIndeterminate="True" IsVisible="{Binding IsBusy}" VerticalAlignment="Center"/></StackPanel></Grid>
+                </Border>
+              </Grid>
+              <Border Name="DialogOverlay" IsVisible="{Binding IsDialogOpen}" Background="#70000000" KeyboardNavigation.TabNavigation="Cycle">
+                <Border MaxWidth="450" Margin="20" Padding="24" CornerRadius="12" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource PdfViewerSurface}" BorderBrush="{DynamicResource PdfViewerBorder}" BorderThickness="1">
+                  <StackPanel Spacing="16"><TextBlock Text="{Binding DialogTitle}" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="{Binding DialogMessage}" TextWrapping="Wrap"/><TextBox Name="PART_DialogInput" Text="{Binding DialogValue, Mode=TwoWay}" PasswordChar="●" MaxLength="256" IsVisible="{Binding IsPasswordPrompt}" AutomationProperties.Name="PDF password"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8"><Button Name="DialogCancelButton" Content="Cancel" Command="{Binding CancelDialogCommand}"/><Button Name="DialogAcceptButton" Content="Continue" Command="{Binding AcceptDialogCommand}"/></StackPanel></StackPanel>
+                </Border>
+              </Border>
+            </Grid>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+    </ResourceDictionary>
+  </Styles.Resources>
+  <Style Selector="p|PdfViewer Button.pdfTool"><Setter Property="Margin" Value="2"/><Setter Property="Padding" Value="9,6"/><Setter Property="MinHeight" Value="32"/><Setter Property="CornerRadius" Value="5"/></Style>
+  <Style Selector="p|PdfViewer ToggleButton.pdfTool"><Setter Property="Margin" Value="2"/><Setter Property="Padding" Value="9,6"/><Setter Property="MinHeight" Value="32"/><Setter Property="CornerRadius" Value="5"/></Style>
+  <Style Selector="p|PdfViewer TextBox.pdfInput"><Setter Property="Margin" Value="2"/><Setter Property="MinHeight" Value="32"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="p|PdfViewer ComboBox.pdfInput"><Setter Property="Margin" Value="2"/><Setter Property="MinHeight" Value="32"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+  <Style Selector="p|PdfViewer TextBlock.pdfCaption"><Setter Property="FontSize" Value="10"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource PdfViewerMuted}"/></Style>
+</Styles>

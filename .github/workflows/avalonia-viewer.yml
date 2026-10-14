@@ -1,0 +1,96 @@
+name: Avalonia viewer
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/ProPDF.Avalonia/**'
+      - 'src/ProPDF.Presentation/**'
+      - 'samples/ProPDF.Avalonia.Viewer*/**'
+      - 'tests/ProPDF.Avalonia.Viewer*/**'
+      - 'scripts/avalonia-viewer*'
+      - 'scripts/avalonia_viewer*'
+      - 'scripts/tests/*viewer*'
+      - 'Directory.Packages.props'
+      - '.github/workflows/avalonia-viewer.yml'
+  pull_request:
+    paths:
+      - 'src/ProPDF.Avalonia/**'
+      - 'src/ProPDF.Presentation/**'
+      - 'samples/ProPDF.Avalonia.Viewer*/**'
+      - 'tests/ProPDF.Avalonia.Viewer*/**'
+      - 'scripts/avalonia-viewer*'
+      - 'scripts/avalonia_viewer*'
+      - 'scripts/tests/*viewer*'
+      - 'Directory.Packages.props'
+      - '.github/workflows/avalonia-viewer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: avalonia-viewer-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Capture exact source
+        run: |
+          mkdir -p artifacts/viewer-source artifacts/avalonia-viewer
+          git archive --format=zip HEAD -o artifacts/viewer-source/source.zip
+          git rev-parse HEAD > artifacts/viewer-source/commit.txt
+          git rev-parse HEAD^{tree} > artifacts/viewer-source/tree.txt
+          sha256sum artifacts/viewer-source/source.zip > artifacts/viewer-source/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avalonia-viewer-source
+          path: artifacts/viewer-source/
+          retention-days: 14
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Compile reusable Avalonia control
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/ProPDF.Avalonia/ProPDF.Avalonia.csproj -c Release -p:ProPDFBuildBrowser=false | tee artifacts/avalonia-viewer/control-build.log
+      - name: Validate native viewer contracts
+        if: always() && !cancelled()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run --project tests/ProPDF.Avalonia.Viewer.Smoke -c Release -p:ProPDFBuildBrowser=false -- artifacts/avalonia-viewer/native | tee artifacts/avalonia-viewer/native.log
+      - name: Validate density evidence guards
+        run: python3 -m unittest discover -s scripts/tests -p 'test_viewer_density.py' -v
+      - name: Validate samples and browser interactions
+        if: always() && !cancelled()
+        run: bash scripts/avalonia-viewer-validate.sh
+      - name: Summarize validation evidence
+        if: always() && !cancelled()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in sorted(Path('artifacts/avalonia-viewer').glob('*/report.json')):
+              report = json.loads(path.read_text())
+              state = report.get('finalState', {})
+              print(json.dumps({'report': str(path), 'passed': report.get('passed'), 'count': len(report.get('checks', [])), 'browser': report.get('browser'), 'error': str(report.get('error', ''))[:1500]}))
+              if not report.get('passed'):
+                  print('FAILURE_STATE', json.dumps({k:state.get(k) for k in ('error', 'busy', 'dirty', 'dialog', 'dialogTitle', 'focusedControl', 'pages', 'page')}))
+                  for name in ('page-errors.json', 'console.json', 'density.json'):
+                      sibling = path.with_name(name)
+                      if sibling.exists(): print(name, sibling.read_text()[:8000])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: avalonia-viewer-validation
+          path: artifacts/avalonia-viewer/
+          retention-days: 14
