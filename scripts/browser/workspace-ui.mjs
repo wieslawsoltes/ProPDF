@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import { waitForStableControl } from './native-pointer.mjs';
 
 // Pointer/keyboard interactions against the actual shared native control tree.
 // Never assigns layout, ItemsSource, document bytes, or a mock DOM representation.
@@ -39,11 +40,16 @@ export async function verifyWorkspaceChrome(page, out, state, pointer) {
       const s = JSON.parse(propdfTest.State());
       return width >= 980 || Math.abs(s.viewWidth - (width - 48)) <= 1;
     }, width);
+    // Shell state can precede native ContentControl realization. Observe stable
+    // rendered geometry before asserting it; never reopen the drawer, force
+    // layout, or accept an absent drawer as an out-of-bounds measurement.
+    const pages = await waitForStableControl('PagesPane', () => page.evaluate(() =>
+      new Promise(resolve => requestAnimationFrame(() => resolve({
+        controls: JSON.parse(propdfTest.Controls()), width: innerWidth, height: innerHeight
+      })))), { maximumFrames: 600 });
     const opened = await state();
     assert.equal(opened.toolDraft,'Persistent tool draft','Task changes must retain draft input.');
     if (width < 980) assert.equal(opened.toolsOpen,false,'Narrow drawers must be exclusive.');
-    const controls = await page.evaluate(() => JSON.parse(propdfTest.Controls()));
-    const pages = controls.find(c=>c.name==='PagesPane' && c.visible);
     assert.ok(pages && pages.x >= 0 && pages.x+pages.width <= width,'Drawer must stay inside the viewport.');
     await pointer('ClosePagesButton');
     if ((await state()).toolsOpen) await pointer('CloseToolsButton');
