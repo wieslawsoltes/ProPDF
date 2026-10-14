@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: avalonia-viewer-${{ github.ref }}
+  group: avalonia-viewer-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   validate:
@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Capture exact source
         run: |
           mkdir -p artifacts/viewer-source artifacts/avalonia-viewer
@@ -47,14 +48,26 @@ jobs:
         run: |
           set -euo pipefail
           dotnet build src/ProPDF.Avalonia/ProPDF.Avalonia.csproj -c Release -p:ProPDFBuildBrowser=false | tee artifacts/avalonia-viewer/control-build.log
-      - name: Validate samples and browser interactions
-        run: bash scripts/avalonia-viewer-validate.sh
       - name: Validate native viewer contracts
-        if: always()
+        if: always() && !cancelled()
         shell: bash
         run: |
           set -euo pipefail
           dotnet run --project tests/ProPDF.Avalonia.Viewer.Smoke -c Release -p:ProPDFBuildBrowser=false -- artifacts/avalonia-viewer/native | tee artifacts/avalonia-viewer/native.log
+      - name: Validate samples and browser interactions
+        if: always() && !cancelled()
+        run: bash scripts/avalonia-viewer-validate.sh
+      - name: Summarize validation evidence
+        if: always() && !cancelled()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in sorted(Path('artifacts/avalonia-viewer').glob('*/report.json')):
+              report = json.loads(path.read_text())
+              print(json.dumps({'report': str(path), 'passed': report.get('passed'), 'count': len(report.get('checks', [])), 'browser': report.get('browser'), 'error': str(report.get('error', ''))[:1500]}))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
