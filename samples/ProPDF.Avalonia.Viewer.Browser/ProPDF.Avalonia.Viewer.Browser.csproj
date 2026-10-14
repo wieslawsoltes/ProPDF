@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework><OutputType>Exe</OutputType><IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><WasmMainJSPath>wwwroot/main.js</WasmMainJSPath>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders><PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation><WasmBuildNative>true</WasmBuildNative>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ProPDF.Avalonia.Viewer/ProPDF.Avalonia.Viewer.csproj" />
+    <PackageReference Include="Avalonia.Browser" />
+    <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.WebAssembly" />
+  </ItemGroup>
+</Project>

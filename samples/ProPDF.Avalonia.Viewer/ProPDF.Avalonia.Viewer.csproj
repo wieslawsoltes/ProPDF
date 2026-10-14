@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable><AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/ProPDF.Avalonia/ProPDF.Avalonia.csproj" />
+    <ProjectReference Include="../ProPDF.SampleSupport/ProPDF.SampleSupport.csproj" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+  </ItemGroup>
+</Project>

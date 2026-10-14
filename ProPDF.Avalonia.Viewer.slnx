@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Libraries/"><Project Path="src/ProPDF.Avalonia/ProPDF.Avalonia.csproj" /></Folder>
+  <Folder Name="/Samples/">
+    <Project Path="samples/ProPDF.Avalonia.Viewer/ProPDF.Avalonia.Viewer.csproj" />
+    <Project Path="samples/ProPDF.Avalonia.Viewer.Desktop/ProPDF.Avalonia.Viewer.Desktop.csproj" />
+    <Project Path="samples/ProPDF.Avalonia.Viewer.Browser/ProPDF.Avalonia.Viewer.Browser.csproj" />
+  </Folder>
+</Solution>
