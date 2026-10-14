@@ -145,6 +145,7 @@ internal static class Program
                 Check(frame is not null, "Native viewer screenshot is available");
                 frame!.Save(Path.Combine(output, "native-viewer.png"), PngBitmapEncoderOptions.Default);
             }
+            ViewerFileSaveChecks.Verify(viewer, Pump, Check);
             File.WriteAllText(Path.Combine(output, "state.json"), shell.Snapshot());
             Pump(shell.DisposeAsync().AsTask()); window.Close();
             File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new { passed = true, count = Checks.Count, checks = Checks }, new JsonSerializerOptions { WriteIndented = true }));

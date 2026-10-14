@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="$PWD/artifacts/avalonia-viewer"
 mkdir -p "$OUT"
+node --test scripts/tests/viewer-file-save.test.mjs | tee "$OUT/file-save-js.log"
 dotnet build samples/ProPDF.Avalonia.Viewer.Desktop/ProPDF.Avalonia.Viewer.Desktop.csproj -c Release -p:ProPDFBuildBrowser=false | tee "$OUT/desktop-build.log"
 dotnet test tests/ProPDF.Tests/ProPDF.Tests.csproj -c Release -p:ProPDFBuildBrowser=false --logger trx --results-directory "$OUT/core-tests" | tee "$OUT/core-tests.log"
 dotnet workload install wasm-tools | tee "$OUT/wasm-workload.log"
