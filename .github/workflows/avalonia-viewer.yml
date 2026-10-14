@@ -66,7 +66,13 @@ jobs:
           from pathlib import Path
           for path in sorted(Path('artifacts/avalonia-viewer').glob('*/report.json')):
               report = json.loads(path.read_text())
+              state = report.get('finalState', {})
               print(json.dumps({'report': str(path), 'passed': report.get('passed'), 'count': len(report.get('checks', [])), 'browser': report.get('browser'), 'error': str(report.get('error', ''))[:1500]}))
+              if not report.get('passed'):
+                  print('FAILURE_STATE', json.dumps({k:state.get(k) for k in ('error', 'busy', 'dirty', 'dialog', 'dialogTitle', 'focusedControl', 'pages', 'page')}))
+                  for name in ('page-errors.json', 'console.json'):
+                      sibling = path.with_name(name)
+                      if sibling.exists(): print(name, sibling.read_text()[:8000])
           PY
       - uses: actions/upload-artifact@v4
         if: always()
