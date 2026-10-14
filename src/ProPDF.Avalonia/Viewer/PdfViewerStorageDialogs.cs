@@ -64,7 +64,7 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            throw new IOException("The host save picker failed: " + error, error);
+            throw new IOException("The host save picker failed: " + error.Message, error);
         }
         if (file is null) return null;
         try
@@ -90,7 +90,7 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            throw new IOException("Publishing to the selected destination failed: " + error, error);
+            throw new IOException("Publishing to the selected destination failed: " + error.Message, error);
         }
     }
     public Task<string?> RequestPasswordAsync(CancellationToken cancellationToken) => owner.PromptAsync("Open protected PDF", "Enter the document password. It is used locally and is not stored by the viewer.", true, cancellationToken);
