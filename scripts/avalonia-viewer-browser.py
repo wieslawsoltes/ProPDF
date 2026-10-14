@@ -7,14 +7,15 @@ import traceback
 from pathlib import Path
 from PIL import Image
 from playwright.async_api import async_playwright
+from avalonia_viewer_density import chromium_arguments, capture_density, verify_density
 
 async def run(args):
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
-    checks, console, errors, clicks = [], [], [], []
+    checks, console, errors, clicks, density = [], [], [], [], []
     started = time.monotonic()
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True, args=['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
+        browser = await playwright.chromium.launch(headless=True, args=chromium_arguments(args.dpr))
         context = await browser.new_context(viewport={'width': 1440, 'height': 980}, device_scale_factor=args.dpr,
                                             accept_downloads=True, permissions=['clipboard-read', 'clipboard-write'])
         page = await context.new_page()
@@ -40,6 +41,14 @@ async def run(args):
             print('PASS ' + name, flush=True)
         async def frame():
             await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        async def check_density(label):
+            await settle()
+            await frame()
+            measurement = await capture_density(page)
+            current = await state()
+            density.append({'stage': label, 'measurement': measurement, 'viewer': current['controls'].get('PdfViewer')})
+            verify_density(measurement, current, args.dpr, page.viewport_size)
+            passed(label + ': native pixels, canvas backing store and logical layout agree', measurement)
         def geometry(control):
             return tuple(round(control[key], 2) for key in ('x', 'y', 'width', 'height')) + (control['enabled'],)
         async def stable_control(name, enabled):
@@ -123,13 +132,15 @@ async def run(args):
             assert s['readOnly'] and not s['controls']['HighlightButton']['enabled'], s
             passed('PdfPig document opens in the actual Avalonia WebAssembly app', {'pages': s['pages'], 'tiles': s['sceneTileCount'], 'rasterPixels': s['rasterPixels'], 'fontFaces': s['fontFaceCount']})
             passed('Read-only is the default and editing tools are disabled')
+            await check_density('Full-size browser')
             await click('FitPageButton')
             await settle()
             await page.screenshot(path=str(output / 'viewer-light.png'))
             image = Image.open(output / 'viewer-light.png').convert('RGB')
+            assert image.size == (round(1440 * args.dpr), round(980 * args.dpr)), image.size
             navy = sum(1 for r, g, b in image.getdata() if 15 <= r <= 40 and 30 <= g <= 65 and 55 <= b <= 105)
             assert navy > 5000 * args.dpr * args.dpr, f'Missing rendered PDF title card ({navy} pixels)'
-            passed('Screenshot contains the rendered PDF title card, not an empty canvas', {'navyPixels': navy})
+            passed('Screenshot contains the rendered PDF title card, not an empty canvas', {'navyPixels': navy, 'pixelSize': image.size})
             await click('NextPageButton')
             await until(lambda s: s.get('page') == 2, 'next page')
             await click('LastPageButton')
@@ -283,6 +294,7 @@ async def run(args):
             await until(lambda s: not s.get('sidebar'), 'compact sidebar toggle')
             await click('FitPageButton')
             await settle()
+            await check_density('Resized browser')
             await page.screenshot(path=str(output / 'viewer-compact.png'))
             passed('Narrow browser view uses an overlay sidebar without collapsing the PDF surface')
             assert not errors, errors
@@ -292,7 +304,7 @@ async def run(args):
             report = {'passed': True, 'checks': checks, 'browser': browser.version, 'deviceScaleFactor': args.dpr,
                       'durationSeconds': round(time.monotonic() - started, 2), 'finalState': await state()}
         except Exception as error:
-            report = {'passed': False, 'checks': checks, 'error': str(error), 'traceback': traceback.format_exc(), 'deviceScaleFactor': args.dpr}
+            report = {'passed': False, 'checks': checks, 'error': str(error), 'traceback': traceback.format_exc(), 'deviceScaleFactor': args.dpr, 'browser': browser.version}
             try:
                 report['finalState'] = await state()
                 await page.screenshot(path=str(output / 'failure.png'))
@@ -304,6 +316,7 @@ async def run(args):
             (output / 'console.json').write_text(json.dumps(console, indent=2, ensure_ascii=False))
             (output / 'page-errors.json').write_text(json.dumps(errors, indent=2))
             (output / 'clicks.json').write_text(json.dumps(clicks, indent=2))
+            (output / 'density.json').write_text(json.dumps(density, indent=2))
             await context.close()
             await browser.close()
 

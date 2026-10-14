@@ -1,7 +1,17 @@
 name: Avalonia viewer
 on:
   push:
-    branches: [feat/templated-avalonia-viewer]
+    branches: [main]
+    paths:
+      - 'src/ProPDF.Avalonia/**'
+      - 'src/ProPDF.Presentation/**'
+      - 'samples/ProPDF.Avalonia.Viewer*/**'
+      - 'tests/ProPDF.Avalonia.Viewer*/**'
+      - 'scripts/avalonia-viewer*'
+      - 'scripts/avalonia_viewer*'
+      - 'scripts/tests/*viewer*'
+      - 'Directory.Packages.props'
+      - '.github/workflows/avalonia-viewer.yml'
   pull_request:
     paths:
       - 'src/ProPDF.Avalonia/**'
@@ -9,6 +19,8 @@ on:
       - 'samples/ProPDF.Avalonia.Viewer*/**'
       - 'tests/ProPDF.Avalonia.Viewer*/**'
       - 'scripts/avalonia-viewer*'
+      - 'scripts/avalonia_viewer*'
+      - 'scripts/tests/*viewer*'
       - 'Directory.Packages.props'
       - '.github/workflows/avalonia-viewer.yml'
   workflow_dispatch:
@@ -54,6 +66,8 @@ jobs:
         run: |
           set -euo pipefail
           dotnet run --project tests/ProPDF.Avalonia.Viewer.Smoke -c Release -p:ProPDFBuildBrowser=false -- artifacts/avalonia-viewer/native | tee artifacts/avalonia-viewer/native.log
+      - name: Validate density evidence guards
+        run: python3 -m unittest discover -s scripts/tests -p 'test_viewer_density.py' -v
       - name: Validate samples and browser interactions
         if: always() && !cancelled()
         run: bash scripts/avalonia-viewer-validate.sh
@@ -70,7 +84,7 @@ jobs:
               print(json.dumps({'report': str(path), 'passed': report.get('passed'), 'count': len(report.get('checks', [])), 'browser': report.get('browser'), 'error': str(report.get('error', ''))[:1500]}))
               if not report.get('passed'):
                   print('FAILURE_STATE', json.dumps({k:state.get(k) for k in ('error', 'busy', 'dirty', 'dialog', 'dialogTitle', 'focusedControl', 'pages', 'page')}))
-                  for name in ('page-errors.json', 'console.json'):
+                  for name in ('page-errors.json', 'console.json', 'density.json'):
                       sibling = path.with_name(name)
                       if sibling.exists(): print(name, sibling.read_text()[:8000])
           PY
