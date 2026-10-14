@@ -48,8 +48,13 @@ jobs:
           set -euo pipefail
           dotnet build src/ProPDF.Avalonia/ProPDF.Avalonia.csproj -c Release -p:ProPDFBuildBrowser=false | tee artifacts/avalonia-viewer/control-build.log
       - name: Validate samples and browser interactions
-        if: hashFiles('scripts/avalonia-viewer-validate.sh') != ''
         run: bash scripts/avalonia-viewer-validate.sh
+      - name: Validate native viewer contracts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run --project tests/ProPDF.Avalonia.Viewer.Smoke -c Release -p:ProPDFBuildBrowser=false -- artifacts/avalonia-viewer/native | tee artifacts/avalonia-viewer/native.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
