@@ -35,6 +35,7 @@ markdown_extensions:
 nav:
   - Overview: index.md
   - Avalonia PDF viewer: avalonia-viewer.md
+  - Avalonia viewer file output: avalonia-viewer-file-output.md
   - Uno Platform: uno-platform.md
   - Document workspace: workspace-ui.md
   - Getting started: getting-started.md
