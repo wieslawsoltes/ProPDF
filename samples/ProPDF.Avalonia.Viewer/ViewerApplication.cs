@@ -11,6 +11,7 @@ public sealed class ViewerApplication : Application
 {
     public static ViewerShell? Shell { get; private set; }
     public static Func<IPdfViewerPrintService>? CreatePrintService { get; set; }
+    public static Func<IPdfViewerFileSaveService>? CreateFileSaveService { get; set; }
     public override void Initialize()
     {
         RequestedThemeVariant = ThemeVariant.Light;
@@ -21,6 +22,7 @@ public sealed class ViewerApplication : Application
     {
         Shell = new ViewerShell();
         Shell.Viewer.PrintService = CreatePrintService?.Invoke();
+        Shell.Viewer.FileSaveService = CreateFileSaveService?.Invoke();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new Window { Title = "ProPDF · Avalonia PDF Viewer", Width = 1440, Height = 980, MinWidth = 360, MinHeight = 420, Content = Shell };

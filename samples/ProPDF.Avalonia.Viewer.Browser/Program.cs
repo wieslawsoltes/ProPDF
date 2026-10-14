@@ -12,9 +12,9 @@ public static partial class Program
     public static Task Main(string[] args)
     {
         ViewerApplication.CreatePrintService = () => new BrowserPdfPrintHandoff();
-        // Browser options must participate in PreSetupBrowser. Registering a fresh
-        // instance with AppBuilder.With later replaces the initialized asset resolver
-        // and breaks lazy imports such as the native/browser storage provider.
+        ViewerApplication.CreateFileSaveService = () => new BrowserFileSaveHandoff();
+        // Pass options to browser pre-setup so lazy storage imports retain the
+        // initialized asset resolver. Open still uses the real browser file picker.
         return AppBuilder.Configure<ViewerApplication>().WithInterFont().LogToTrace()
             .StartBrowserAppAsync("out", new BrowserPlatformOptions { PreferFileDialogPolyfill = true });
     }
@@ -22,6 +22,21 @@ public static partial class Program
     public static string Snapshot() => ViewerApplication.Shell?.Snapshot() ?? "{\"ready\":false}";
     [JSImport("printPdf", "viewer-host")]
     internal static partial void PrintPdf(string base64);
+    [JSImport("saveFile", "viewer-host")]
+    internal static partial void SaveFile(string base64, string suggestedName);
+
+    // An explicit download handoff avoids treating a write-only download handle
+    // as a native read/write filesystem handle. No browser permission is patched,
+    // requested globally, or silently bypassed after a native picker denial.
+    private sealed class BrowserFileSaveHandoff : IPdfViewerFileSaveService
+    {
+        public async Task SaveAsync(Stream content, string suggestedName, CancellationToken cancellationToken = default)
+        {
+            var bytes = await PdfStreams.ReadBoundedAsync(content, 128L * 1024 * 1024, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            SaveFile(Convert.ToBase64String(bytes), suggestedName);
+        }
+    }
     private sealed class BrowserPdfPrintHandoff : IPdfViewerPrintService
     {
         public Task PrintAsync(PdfSnapshot document, CancellationToken cancellationToken = default)

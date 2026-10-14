@@ -11,6 +11,7 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
     private const long MaximumInputBytes = 128L * 1024 * 1024;
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "propdf-viewer", Guid.NewGuid().ToString("N"));
     private readonly Dictionary<string, IStorageFile> _destinations = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Name, IPdfViewerFileSaveService Service)> _hostDestinations = new(StringComparer.Ordinal);
     private readonly HashSet<string> _stages = new(StringComparer.Ordinal);
     private bool _disposed;
     public bool AlwaysPickSaveDestination => true;
@@ -57,6 +58,14 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
         cancellationToken.ThrowIfCancellationRequested();
         suggestedName = Path.GetFileName(suggestedName);
         if (suggestedName.Length > 33 && suggestedName[32] == '_' && Guid.TryParseExact(suggestedName[..32], "N", out _)) suggestedName = suggestedName[33..];
+        if (owner.FileSaveService is { } service)
+        {
+            // Capture this operation's service. Changing the host property while a
+            // save is pending must not redirect an already authorized handoff.
+            var stage = CreateStage(suggestedName);
+            _hostDestinations.Add(stage, (suggestedName, service));
+            return stage;
+        }
         IStorageFile? file;
         try
         {
@@ -76,6 +85,15 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
     }
     public async Task PublishFileAsync(string stagedPath, CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_hostDestinations.Remove(stagedPath, out var destination))
+        {
+            await using var content = new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+            await destination.Service.SaveAsync(content, destination.Name, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return;
+        }
         if (!_destinations.Remove(stagedPath, out var file)) throw new InvalidOperationException("No user-selected output destination exists for this operation.");
         try
         {
@@ -119,6 +137,7 @@ internal sealed class PdfViewerStorageDialogs(PdfViewer owner) : IPdfWorkspaceDi
     internal void ReleaseCompletedOperations()
     {
         foreach (var file in _destinations.Values) file.Dispose(); _destinations.Clear();
+        _hostDestinations.Clear();
         foreach (var path in _stages) TryDelete(path); _stages.Clear();
     }
     private static void TryDelete(string path) { try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { } }

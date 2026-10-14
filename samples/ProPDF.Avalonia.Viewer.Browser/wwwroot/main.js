@@ -1,9 +1,11 @@
 import { dotnet } from './_framework/dotnet.js';
+import { saveFile } from './file-save.mjs';
 
 let lastPrintUrl;
 try {
   const runtime = await dotnet.withDiagnosticTracing(false).withApplicationArgumentsFromQuery().create();
   runtime.setModuleImports('viewer-host', {
+    saveFile,
     printPdf(base64) {
       const target = window.open('about:blank', '_blank');
       if (!target) throw new Error('The print window was blocked. Allow this site to open its PDF print preview.');
