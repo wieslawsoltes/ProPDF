@@ -4,7 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media.Imaging;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -48,6 +50,13 @@ internal static class Program
             Check(viewer.GetVisualDescendants().OfType<PdfViewerSidebar>().Any(), "Sidebar is an independently templated part");
             using (var scene = runtime.Viewport.CaptureScene()) Check(scene.TileCount > 0 && scene.RasterPixelCount > 0, "Native Skia renders real PDF tiles");
             Check(shell.FontFaceCount >= 2, "Explicit regular and bold fallback faces are present");
+            var fitButton = viewer.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FitWidthButton");
+            Check(fitButton.Focus(), "Toolbar button can receive keyboard focus");
+            window.KeyPress(Key.F, RawInputModifiers.Control); Pump(Task.CompletedTask);
+            Check(viewer.IsSearchBarVisible, "Ctrl+F from a toolbar button reveals the search bar");
+            Check((window.FocusManager?.GetFocusedElement() as Control)?.Name == "PART_SearchBox", "Find moves keyboard focus to the search box");
+            window.KeyPress(Key.Escape, RawInputModifiers.None); Pump(Task.CompletedTask);
+            Check(!viewer.IsSearchBarVisible, "Escape closes keyboard find");
             Pump(viewer.NextPageCommand.ExecuteAsync()); Until(() => viewer.PageNumber == 2);
             Check(runtime.Viewport.CurrentPage == 2, "Viewer command navigates the actual controller");
             Pump(viewer.PreviousPageCommand.ExecuteAsync()); Until(() => viewer.PageNumber == 1);
@@ -104,7 +113,11 @@ internal static class Program
             Until(() => viewer.IsCompact);
             Check(viewer.ViewportMargin.Left == 0, "Narrow layout overlays the sidebar");
             Pump(runtime.Viewport.WaitForRenderingAsync());
-            using (var frame = window.CaptureRenderedFrame()) frame?.Save(Path.Combine(output, "native-viewer.png"));
+            using (var frame = window.CaptureRenderedFrame())
+            {
+                Check(frame is not null, "Native viewer screenshot is available");
+                frame!.Save(Path.Combine(output, "native-viewer.png"), PngBitmapEncoderOptions.Default);
+            }
             File.WriteAllText(Path.Combine(output, "state.json"), shell.Snapshot());
             Pump(shell.DisposeAsync().AsTask()); window.Close();
             File.WriteAllText(Path.Combine(output, "report.json"), JsonSerializer.Serialize(new { passed = true, count = Checks.Count, checks = Checks }, new JsonSerializerOptions { WriteIndented = true }));
