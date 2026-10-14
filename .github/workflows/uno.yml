@@ -24,6 +24,7 @@ jobs:
         run: |
           dotnet workload install wasm-tools
           dotnet restore ProPDF.slnx -p:Configuration=Release
+          dotnet restore samples/ProPDF.Avalonia.Viewer.Browser -p:Configuration=Release
       - name: Collect license evidence
         run: python scripts/collect-license-evidence.py
       - name: Build desktop sample
