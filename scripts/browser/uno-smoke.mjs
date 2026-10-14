@@ -182,6 +182,9 @@ try {
   await healthy(); await command('UndoButton'); assert.equal((await state()).dirty, false); checks.push('pointer page rotation and undo');
   await pointer('FindPaneButton');
   await page.waitForFunction(() => JSON.parse(propdfTest.State()).searchOpen);
+  // Shell visibility precedes ScrollViewer content realization. Wait for stable
+  // native bounds and focus the actual input before using the bound-text bridge.
+  await pointer('SearchQueryInput');
   await text('SearchQueryInput', 'workspace'); await command('SearchButton'); assert.ok((await state()).matches > 0);
   await text('SearchQueryInput', ''); await command('SearchButton'); checks.push('search and clearing highlights');
   await pointer('CloseSearchButton');
