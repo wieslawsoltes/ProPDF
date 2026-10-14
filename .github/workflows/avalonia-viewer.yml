@@ -5,9 +5,11 @@ on:
   pull_request:
     paths:
       - 'src/ProPDF.Avalonia/**'
+      - 'src/ProPDF.Presentation/**'
       - 'samples/ProPDF.Avalonia.Viewer*/**'
       - 'tests/ProPDF.Avalonia.Viewer*/**'
       - 'scripts/avalonia-viewer*'
+      - 'Directory.Packages.props'
       - '.github/workflows/avalonia-viewer.yml'
   workflow_dispatch:
 permissions:
@@ -22,10 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          persist-credentials: false
       - name: Capture exact source
         run: |
-          mkdir -p artifacts/viewer-source
+          mkdir -p artifacts/viewer-source artifacts/avalonia-viewer
           git archive --format=zip HEAD -o artifacts/viewer-source/source.zip
           git rev-parse HEAD > artifacts/viewer-source/commit.txt
           git rev-parse HEAD^{tree} > artifacts/viewer-source/tree.txt
@@ -36,14 +38,20 @@ jobs:
           path: artifacts/viewer-source/
           retention-days: 14
       - uses: actions/setup-dotnet@v4
-        if: hashFiles('samples/ProPDF.Avalonia.Viewer.Browser/*.csproj') != ''
         with:
-          dotnet-version: '10.0.x'
-      - name: Build and test viewer
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Compile reusable Avalonia control
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/ProPDF.Avalonia/ProPDF.Avalonia.csproj -c Release -p:ProPDFBuildBrowser=false | tee artifacts/avalonia-viewer/control-build.log
+      - name: Validate samples and browser interactions
         if: hashFiles('scripts/avalonia-viewer-validate.sh') != ''
         run: bash scripts/avalonia-viewer-validate.sh
       - uses: actions/upload-artifact@v4
-        if: always() && hashFiles('artifacts/avalonia-viewer/**') != ''
+        if: always()
         with:
           name: avalonia-viewer-validation
           path: artifacts/avalonia-viewer/
