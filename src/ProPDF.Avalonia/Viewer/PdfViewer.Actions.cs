@@ -124,13 +124,25 @@ public partial class PdfViewer
             {
                 SetCurrentValue(IsSearchBarVisibleProperty, true); Dispatcher.UIThread.Post(() => { _searchBox?.Focus(); _searchBox?.SelectAll(); }); e.Handled = true; return;
             }
+            // File actions are viewer-wide, including when a search or form input
+            // has focus. Prevent browser defaults before yielding to the host picker.
+            if (modifier && e.Key == Key.O)
+            {
+                e.Handled = true;
+                if (Workspace is not null) await Workspace.OpenCommand.ExecuteAsync();
+                return;
+            }
+            if (modifier && e.Key == Key.S)
+            {
+                e.Handled = true;
+                if (Workspace is not null) await Workspace.SaveAsCommand.ExecuteAsync();
+                return;
+            }
+            if (modifier && e.Key == Key.P) command = PrintCommand;
             if (modifier && textBox is null)
             {
                 switch (e.Key)
                 {
-                    case Key.O: if (Workspace is not null) await Workspace.OpenCommand.ExecuteAsync(); e.Handled = true; return;
-                    case Key.S: if (Workspace is not null) await Workspace.SaveAsCommand.ExecuteAsync(); e.Handled = true; return;
-                    case Key.P: command = PrintCommand; break;
                     case Key.Z: command = (e.KeyModifiers & KeyModifiers.Shift) != 0 ? RedoCommand : UndoCommand; break;
                     case Key.Y: command = RedoCommand; break;
                     case Key.D0: command = FitPageCommand; break;
@@ -143,8 +155,8 @@ public partial class PdfViewer
             if (e.Key == Key.F3) command = (e.KeyModifiers & KeyModifiers.Shift) != 0 ? PreviousMatchCommand : NextMatchCommand;
             if ((e.KeyModifiers & KeyModifiers.Alt) != 0 && Workspace is not null && textBox is null)
             {
-                if (e.Key == Key.Left) { await Workspace.BackCommand.ExecuteAsync(); e.Handled = true; return; }
-                if (e.Key == Key.Right) { await Workspace.ForwardCommand.ExecuteAsync(); e.Handled = true; return; }
+                if (e.Key == Key.Left) { e.Handled = true; await Workspace.BackCommand.ExecuteAsync(); return; }
+                if (e.Key == Key.Right) { e.Handled = true; await Workspace.ForwardCommand.ExecuteAsync(); return; }
             }
             if (e.Key == Key.Enter && textBox is not null)
             {
